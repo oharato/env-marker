@@ -72,4 +72,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
+// ストレージの変更を監視してデバッグログを出力
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
+    console.log(
+      `[env-marker][storage] Storage key "${key}" in namespace "${namespace}" changed.`,
+      `Old value was:`, oldValue,
+      `New value is:`, newValue
+    );
+  }
+});
 

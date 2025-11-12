@@ -43,7 +43,13 @@ async function save() {
   const patterns = patternsEl.value.split(/\s+/).filter(Boolean);
   const color = colorEl.value;
   const bannerPosition = document.querySelector('input[name="position"]:checked').value;
-  const bannerSize = parseInt(bannerSizeEl.value, 10) || 4;
+  
+  let bannerSize = parseInt(bannerSizeEl.value, 10);
+  if (isNaN(bannerSize) || bannerSize < 1) {
+    bannerSize = 4; // 不正な値や1未満の場合はデフォルト値にフォールバック
+  }
+
+  console.debug('[env-marker][options] Saving bannerSize:', bannerSize);
 
   // sync と local の両方に保存してフォールバックを安定させる
   await chrome.storage.sync.set({patterns, color, bannerPosition, bannerSize});
