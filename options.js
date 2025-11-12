@@ -3,6 +3,7 @@
 
 const patternsEl = document.getElementById('patterns');
 const colorEl = document.getElementById('color');
+const colorPresetsEl = document.getElementById('color-presets');
 const bannerSizeEl = document.getElementById('bannerSize');
 const positionOptions = document.getElementById('position-options');
 
@@ -56,6 +57,18 @@ async function save() {
   await chrome.storage.local.set({patterns, color, bannerPosition, bannerSize});
   console.info('[env-marker][options] Settings auto-saved.', {patterns, color, bannerPosition, bannerSize});
 }
+
+// --- イベントリスナー ---
+
+// プリセットカラーが選択されたら、カラーピッカーの値を更新して保存をトリガー
+colorPresetsEl.addEventListener('change', () => {
+  const selectedColor = colorPresetsEl.value;
+  if (selectedColor) {
+    colorEl.value = selectedColor;
+    // カラーピッカーのchangeイベントを発火させて、自動保存ロジックを呼び出す
+    colorEl.dispatchEvent(new Event('change'));
+  }
+});
 
 // 各要素の変更イベントをリッスンして自動保存
 patternsEl.addEventListener('change', save);

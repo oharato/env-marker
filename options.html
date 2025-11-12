@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>Env Marker - Options</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 16px; }
+      body { font-family: Arial, sans-serif; margin: 16px; width: 380px; }
       label { display: block; margin-top: 8px }
       input[type="text"] { width: 300px }
       #position-options { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 4px; }
@@ -12,22 +12,36 @@
     </style>
   </head>
   <body>
-    <h1>Env Marker 設定</h1>
-    <label>対象パターン（URL or IP, 改行で複数）</label>
+    <h1>Env Marker Settings</h1>
+    <label>Target Patterns (URL or IP, one per line)</label>
     <textarea id="patterns" rows="6" cols="40"></textarea>
-    <label>バナー色</label>
-    <input type="color" id="color" value="#ff6666" />
-
-    <label>バナー表示位置</label>
-    <div id="position-options">
-      <label><input type="radio" name="position" value="top" checked> 上</label>
-      <label><input type="radio" name="position" value="bottom"> 下</label>
-      <label><input type="radio" name="position" value="left"> 左</label>
-      <label><input type="radio" name="position" value="right"> 右</label>
-      <label><input type="radio" name="position" value="frame"> 枠 (Frame)</label>
+    <label>Banner Color</label>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <input type="color" id="color" value="#ff6666" />
+      <select id="color-presets">
+        <option value="">Select Preset Color...</option>
+        <option value="#d9534f">Red (Danger)</option>
+        <option value="#428bca">Blue (Info)</option>
+        <option value="#5cb85c">Green (Success)</option>
+        <option value="#f0ad4e">Yellow (Warning)</option>
+        <option value="#333333">Black (Dark)</option>
+      </select>
     </div>
 
-    <label for="bannerSize" style="margin-top: 12px;">バナーの太さ (px)</label>
+    <label>Banner Position</label>
+    <div id="position-options" style="max-width: 300px;">
+      <label><input type="radio" name="position" value="top" checked> Top</label>
+      <label><input type="radio" name="position" value="bottom"> Bottom</label>
+      <label><input type="radio" name="position" value="left"> Left</label>
+      <label><input type="radio" name="position" value="right"> Right</label>
+      <label><input type="radio" name="position" value="frame"> Frame</label>
+      <label><input type="radio" name="position" value="top-right"> Top-Right Ribbon</label>
+      <label><input type="radio" name="position" value="top-left"> Top-Left Ribbon</label>
+      <label><input type="radio" name="position" value="bottom-right"> Bottom-Right Ribbon</label>
+      <label><input type="radio" name="position" value="bottom-left"> Bottom-Left Ribbon</label>
+    </div>
+
+    <label for="bannerSize" style="margin-top: 12px;">Banner Thickness (px)</label>
     <div>
       <input type="number" id="bannerSize" min="1" max="50" style="width: 70px;">
     </div>

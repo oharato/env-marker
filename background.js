@@ -31,8 +31,18 @@ chrome.webRequest.onCompleted.addListener(async (details) => {
 
     const matchedPattern = patterns.find(pattern => {
       if (pattern.trim() === '') return false;
-      // URL or IP
-      return details.url.includes(pattern) || remoteIp === pattern;
+      try {
+        const regexPattern = pattern
+          .replace(/[.+?^${}()|[\]\\]/g, '\\$&') // . や + などの文字をエスケープ
+          .replace(/\*/g, '.*'); // アスタリスクをワイルドカードに変換
+        
+        const regex = new RegExp(regexPattern);
+        // URL または IPアドレスに対して正規表現テストを実行
+        return regex.test(details.url) || (remoteIp && regex.test(remoteIp));
+      } catch (e) {
+        console.error(`[env-marker][background] Invalid regex pattern from user input: "${pattern}"`, e);
+        return false;
+      }
     });
 
     if (!matchedPattern) {

@@ -5,7 +5,8 @@
   "description": "指定したURLやIPアドレスのサイトに目印をつけます",
   "permissions": ["storage", "webRequest"],
   "action": {
-    "default_title": "Env Marker"
+    "default_title": "Env Marker",
+    "default_popup": "options.html"
   },
   "background": {
     "service_worker": "background.js",
