@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Env Marker - Options</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 16px; }
+      label { display: block; margin-top: 8px }
+      input[type="text"] { width: 300px }
+      .ip-list { margin-top: 8px }
+      .ip-item { display:flex; gap:8px; align-items:center; }
+    </style>
+  </head>
+  <body>
+    <h1>Env Marker 設定</h1>
+    <label>対象パターン（URL or IP, 改行で複数）</label>
+    <textarea id="patterns" rows="6" cols="40"></textarea>
+    <label>バナー色</label>
+    <input type="color" id="color" value="#ff6666" />
+    <div style="margin-top:12px">
+      <button id="save">保存</button>
+      <button id="load">読み込み</button>
+    </div>
+
+  <script src="options.js"></script>
+  </body>
+</html>

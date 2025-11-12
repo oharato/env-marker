@@ -1,0 +1,75 @@
+// background.js
+// ここでは必要に応じて将来の拡張機能ロジックを追加できます。
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('Env Marker installed');
+});
+
+// webRequest の onCompleted で接続先の IP を取得して、監視リストに含まれていればタブへ通知する
+chrome.webRequest.onCompleted.addListener(async (details) => {
+  try {
+    // details に remoteIp が含まれる（Manifest V3 + host_permissions が必要）
+    const remoteIp = details.ip || details.remoteIp || details.remoteAddress || null;
+    console.debug('[env-marker][background] onCompleted', {url: details.url, tabId: details.tabId, remoteIp, details});
+    if (!remoteIp) {
+      console.debug('[env-marker][background] no remote IP available for request');
+      return;
+    }
+    let data = await chrome.storage.sync.get({patterns: [], color: '#ff6666'});
+    let patterns = data.patterns || [];
+    let color = data.color || '#ff6666';
+    if ((!patterns || patterns.length === 0) || !color) {
+      const fallback = await chrome.storage.local.get({patterns: [], color: '#ff6666'});
+      if ((!patterns || patterns.length === 0) && fallback.patterns && fallback.patterns.length) {
+        console.debug('[env-marker][background] sync empty, using local storage patterns', fallback.patterns);
+        patterns = fallback.patterns;
+      }
+      if ((!color || color === '') && fallback.color) {
+        color = fallback.color;
+      }
+    }
+    console.debug('[env-marker][background] stored patterns', patterns);
+
+    const matchedPattern = patterns.find(pattern => {
+      if (pattern.trim() === '') return false;
+      // URL or IP
+      return details.url.includes(pattern) || remoteIp === pattern;
+    });
+
+    if (!matchedPattern) {
+      console.debug('[env-marker][background] no pattern matched', {url: details.url, remoteIp});
+      return;
+    }
+
+    // 対象タブにメッセージ送信してバナーを表示させる
+    if (details.tabId && details.tabId !== -1) {
+      console.info('[env-marker][background] match found, sending message to tab', {tabId: details.tabId, pattern: matchedPattern});
+      chrome.tabs.sendMessage(details.tabId, {type: 'show-env-marker-banner', text: matchedPattern, color});
+      // 拡張のアイコンにバッジを表示
+      try {
+        chrome.action.setBadgeText({text: 'ENV', tabId: details.tabId});
+        // バッジ色は storage の color を使う（chrome accepts [r,g,b,a] or CSS string）
+        chrome.action.setBadgeBackgroundColor({color: color, tabId: details.tabId});
+      } catch (e) {
+        console.debug('[env-marker][background] unable to set badge', e);
+      }
+    } else {
+      console.debug('[env-marker][background] matched IP but no tabId available', {ip: remoteIp, tabId: details.tabId});
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}, {urls: ["<all_urls>"]});
+
+// タブが更新（ナビゲーション等）されたらバッジをクリアする
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // ページの読み込み開始/完了時にバッジをクリアする
+  if (changeInfo.status === 'loading' || changeInfo.status === 'complete' || changeInfo.url) {
+    try {
+      chrome.action.setBadgeText({text: '', tabId});
+    } catch (e) {
+      // ignore
+    }
+  }
+});
+
+
