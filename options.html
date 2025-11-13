@@ -83,9 +83,21 @@
         color: #495057;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         margin: 0;
         font-size: 13px;
         white-space: nowrap;
+        flex: 0 0 calc(50% - 4px); /* 2 items per row by default (for ribbon options) */
+      }
+
+      /* Basic position options - 4 per row */
+      #position-options label:nth-child(n+5) {
+        flex: 0 0 calc(25% - 6px);
+      }
+
+      /* Frame option - full width */
+      #position-options label:last-child {
+        flex: 0 0 calc(25% - 6px);
       }
 
       #position-options label:hover {
