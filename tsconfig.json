@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["chrome"]
+  },
+  "include": [
+    ".wxt/types/imports.d.ts",
+    "entrypoints/**/*.ts",
+    "components/**/*.ts",
+    "hooks/**/*.ts",
+    "utils/**/*.ts"
+  ]
+}

@@ -1,7 +1,9 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8" />
+    <script type="module" src="http://localhost:3000/@vite/client"></script>
+<script src="http://localhost:3000/@id/virtual:wxt-html-plugins" type="module"></script>
+    <meta charset="utf-8">
     <title>Env Marker - Options</title>
     <style>
       body {
@@ -126,8 +128,8 @@
         width: 70px !important;
         text-align: center;
       }
-    </style>
-  </head>
+    </style>  <script type="module" crossorigin="" src="/chunks/options-BWk36kL9.js"></script>
+</head>
   <body>
     <h1>Env Marker Settings</h1>
     <label for="setting-selector">Setting Profile</label>
@@ -143,7 +145,7 @@
     <textarea id="patterns" rows="6" cols="40"></textarea>
     <label>Marker Color</label>
     <div style="display: flex; align-items: center; gap: 10px;">
-      <input type="color" id="color" value="#ff6666" />
+      <input type="color" id="color" value="#ff6666">
       <select id="color-presets">
         <option value="">Select Preset Color...</option>
         <option value="#d9534f">Red (Danger)</option>
@@ -172,7 +174,6 @@
       <input type="number" id="bannerSize" min="1" max="50" style="width: 70px;">
     </div>
 
-
-  <script type="module" src="options.js"></script>
+    <script src="http://localhost:3000/entrypoints/options/index.ts" type="module"></script>
   </body>
 </html>
