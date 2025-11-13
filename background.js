@@ -14,17 +14,29 @@ chrome.webRequest.onCompleted.addListener(async (details) => {
       console.debug('[env-marker][background] no remote IP available for request');
       return;
     }
-    let data = await chrome.storage.sync.get({patterns: [], color: '#ff6666'});
-    let patterns = data.patterns || [];
-    let color = data.color || '#ff6666';
+    
+    // Get current setting profile
+    const { currentSetting } = await chrome.storage.sync.get({currentSetting: 'setting1'});
+    const settingKey = currentSetting;
+    
+    let data = await chrome.storage.sync.get({
+      [`${settingKey}_patterns`]: [],
+      [`${settingKey}_color`]: '#ff6666'
+    });
+    let patterns = data[`${settingKey}_patterns`] || [];
+    let color = data[`${settingKey}_color`] || '#ff6666';
+    
     if ((!patterns || patterns.length === 0) || !color) {
-      const fallback = await chrome.storage.local.get({patterns: [], color: '#ff6666'});
-      if ((!patterns || patterns.length === 0) && fallback.patterns && fallback.patterns.length) {
-        console.debug('[env-marker][background] sync empty, using local storage patterns', fallback.patterns);
-        patterns = fallback.patterns;
+      const fallback = await chrome.storage.local.get({
+        [`${settingKey}_patterns`]: [],
+        [`${settingKey}_color`]: '#ff6666'
+      });
+      if ((!patterns || patterns.length === 0) && fallback[`${settingKey}_patterns`] && fallback[`${settingKey}_patterns`].length) {
+        console.debug('[env-marker][background] sync empty, using local storage patterns', fallback[`${settingKey}_patterns`]);
+        patterns = fallback[`${settingKey}_patterns`];
       }
-      if ((!color || color === '') && fallback.color) {
-        color = fallback.color;
+      if ((!color || color === '') && fallback[`${settingKey}_color`]) {
+        color = fallback[`${settingKey}_color`];
       }
     }
     console.debug('[env-marker][background] stored patterns', patterns);
