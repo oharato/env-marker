@@ -3,55 +3,74 @@ export default defineContentScript({
   runAt: 'document_start',
 
   main: async () => {
-    // ページのロード時にホストが許可されたパターンリストに含まれるかチェックし、含まれていればマーカーを表示する
+    // ページのロード時にすべての有効な設定をチェックし、マッチするものがあればマーカーを表示する
     try {
       const host = location.hostname;
       const url = location.href;
       console.debug('[env-marker][content] Initializing content script for:', url);
 
-      // Get current setting profile
-      const { currentSetting } = await chrome.storage.sync.get({currentSetting: 'setting1'});
-      const settingKey = currentSetting;
+      // すべての設定プロファイルをチェック
+      const allSettings = ['setting1', 'setting2', 'setting3', 'setting4', 'setting5'];
+      let matchedSetting: { pattern: string; color: string; position: string; size: number } | null = null;
 
-      // ストレージから全設定を取得
-      const data = await chrome.storage.sync.get({
-        [`${settingKey}_patterns`]: [],
-        [`${settingKey}_color`]: '#ff6666',
-        [`${settingKey}_bannerPosition`]: 'top',
-        [`${settingKey}_bannerSize`]: 40
-      });
-      console.debug('[env-marker][content] Loaded settings on init:', data);
-      
-      const patterns = data[`${settingKey}_patterns`] || [];
-      const color = data[`${settingKey}_color`] || '#ff6666';
-      const bannerPosition = data[`${settingKey}_bannerPosition`] || 'top';
-      const bannerSize = data[`${settingKey}_bannerSize`] || 40;
-
-      // パターンにマッチするかチェック
-      const matchedPattern = patterns.find((pattern: string) => {
-        if (pattern.trim() === '') return false;
-        try {
-          // アスタリスク(*)を正規表現の(.*)に変換し、他の正規表現特殊文字をエスケープ
-          const regexPattern = pattern
-            .replace(/[.+?^${}()|[\\]/g, '\\$&') // . や + などの文字をエスケープ
-            .replace(/\*/g, '.*'); // アスタリスクをワイルドカードに変換
-          
-          const regex = new RegExp(regexPattern);
-          return regex.test(url);
-        } catch (e) {
-          console.error(`[env-marker] Invalid regex pattern from user input: "${pattern}"`, e);
-          return false;
+      for (const settingKey of allSettings) {
+        // ストレージから設定を取得
+        const data = await chrome.storage.sync.get({
+          [`${settingKey}_patterns`]: [],
+          [`${settingKey}_color`]: '#ff6666',
+          [`${settingKey}_bannerPosition`]: 'top',
+          [`${settingKey}_bannerSize`]: 40,
+          [`${settingKey}_enabled`]: true
+        });
+        
+        const enabled = data[`${settingKey}_enabled`];
+        if (!enabled) {
+          console.debug(`[env-marker][content] ${settingKey} is disabled, skipping`);
+          continue;
         }
-      });
 
-      if (!matchedPattern) {
+        const patterns = data[`${settingKey}_patterns`] || [];
+        const color = data[`${settingKey}_color`] || '#ff6666';
+        const bannerPosition = data[`${settingKey}_bannerPosition`] || 'top';
+        const bannerSize = data[`${settingKey}_bannerSize`] || 40;
+
+        // パターンにマッチするかチェック
+        const matchedPattern = patterns.find((pattern: string) => {
+          if (pattern.trim() === '') return false;
+          try {
+            // アスタリスク(*)を正規表現の(.*)に変換し、他の正規表現特殊文字をエスケープ
+            const regexPattern = pattern
+              .replace(/[.+?^${}()|[\\]/g, '\\$&') // . や + などの文字をエスケープ
+              .replace(/\*/g, '.*'); // アスタリスクをワイルドカードに変換
+            
+            const regex = new RegExp(regexPattern);
+            return regex.test(url);
+          } catch (e) {
+            console.error(`[env-marker] Invalid regex pattern from user input: "${pattern}"`, e);
+            return false;
+          }
+        });
+
+        if (matchedPattern) {
+          console.info(`[env-marker][content] Matched with ${settingKey}:`, matchedPattern);
+          matchedSetting = {
+            pattern: matchedPattern,
+            color: color,
+            position: bannerPosition,
+            size: bannerSize
+          };
+          break; // 最初にマッチした設定を使用
+        }
+      }
+
+      if (!matchedSetting) {
         console.debug('[env-marker][content] No pattern matched.');
         return;
       }
 
       // マッチした場合はバナー表示
-      console.info('[env-marker][content] Pattern matched. Showing banner.', { matchedPattern, color, bannerPosition, bannerSize });
-      showBanner(matchedPattern, color, bannerPosition, bannerSize);
+      console.info('[env-marker][content] Pattern matched. Showing banner.', matchedSetting);
+      showBanner(matchedSetting.pattern, matchedSetting.color, matchedSetting.position, matchedSetting.size);
     } catch (e) {
       console.error(e);
     }

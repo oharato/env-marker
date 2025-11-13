@@ -6,9 +6,19 @@ export default defineConfig({
     version: '1.0', // package.json の version を使うことも可能
     description: '指定したURLやIPアドレスのサイトに目印をつけます',
     permissions: ['storage', 'webRequest'],
+    icons: {
+      '16': 'icon16.png',
+      '48': 'icon48.png',
+      '128': 'icon128.png',
+    },
     action: {
       default_title: 'Env Marker',
       default_popup: 'options.html', // エントリーポイントとして扱う
+      default_icon: {
+        '16': 'icon16.png',
+        '48': 'icon48.png',
+        '128': 'icon128.png',
+      },
     },
     background: {
       service_worker: 'background.js', // エントリーポイントとして扱う

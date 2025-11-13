@@ -25,20 +25,23 @@
 2. 「新しいアイテム」をクリック
 3. 以下のコマンドで作成した ZIP ファイルをアップロード：
    ```bash
-   npm install
-   npm run build
-   cd dist
-   zip -r ../extension.zip .
+   pnpm install
+   pnpm build
+   cd .output/chrome-mv3
+   zip -r ../../extension.zip .
+   cd ../..
    ```
 4. 拡張機能の詳細情報を入力：
    - 名前：Env Marker
-   - 説明：指定したURLやIPアドレスのサイトに目印をつけます
+   - 説明：指定したURLやIPアドレスのサイトに視覚的なマーカーを表示するChrome拡張機能
    - カテゴリ：開発者ツール
    - スクリーンショット（最低1枚必要）
    - アイコン画像（128x128px）
+   - プライバシーポリシー（必要な場合）
 5. 「下書きを保存」または「審査に提出」
 6. アップロード完了後、URL に表示される拡張機能 ID（32文字の英数字）をメモしてください
    - 例：`abcdefghijklmnopqrstuvwxyz123456`
+   - URL: `https://chrome.google.com/webstore/detail/YOUR_EXTENSION_ID`
 
 ### 3. Google Cloud Platform での OAuth クライアント設定
 
@@ -132,11 +135,66 @@ GitHub リポジトリに以下のシークレットを設定します。
 
 設定完了後、以下の流れで自動デプロイが実行されます：
 
-1. 開発ブランチで作業
+1. 開発ブランチ（例：`wxt-pnpm`）で作業
 2. Pull Request を作成してレビュー
-3. `master` ブランチにマージ
+3. `master` または `main` ブランチにマージ
 4. GitHub Actions が自動的に実行される
 5. Chrome Web Store に新しいバージョンがアップロードされ、公開される
+
+**注意**: GitHub Actions ワークフローファイル（`.github/workflows/deploy.yml`）を作成する必要があります。
+
+### GitHub Actions ワークフローの例
+
+`.github/workflows/deploy.yml` を以下の内容で作成してください：
+
+```yaml
+name: Deploy to Chrome Web Store
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Build extension
+        run: pnpm build
+      
+      - name: Create ZIP
+        run: |
+          cd .output/chrome-mv3
+          zip -r ../../extension.zip .
+          cd ../..
+      
+      - name: Upload to Chrome Web Store
+        uses: mobilefirstllc/cws-publish@latest
+        with:
+          action: 'upload'
+          client_id: ${{ secrets.CHROME_CLIENT_ID }}
+          client_secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh_token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          extension_id: ${{ secrets.CHROME_EXTENSION_ID }}
+          zip_file: 'extension.zip'
+```
 
 ## デプロイ状況の確認
 
@@ -148,8 +206,9 @@ GitHub リポジトリに以下のシークレットを設定します。
 
 ### ビルドエラー
 
-- `npm ci` が失敗する場合：`package-lock.json` が最新か確認
-- ビルドが失敗する場合：ローカルで `npm run build` を実行して問題を特定
+- `pnpm install` が失敗する場合：`pnpm-lock.yaml` が最新か確認
+- ビルドが失敗する場合：ローカルで `pnpm build` を実行して問題を特定
+- TypeScript エラー：型定義の問題を解決してからコミット
 
 ### アップロードエラー
 
@@ -164,14 +223,62 @@ GitHub リポジトリに以下のシークレットを設定します。
 
 ## バージョン管理
 
-Chrome Web Store にアップロードするには、`manifest.json` のバージョン番号を更新する必要があります。
+Chrome Web Store にアップロードするには、バージョン番号を更新する必要があります。
 
-現在のバージョン：`1.0`
+### WXTでのバージョン管理
 
-新しいバージョンをリリースする場合：
-1. `manifest.json` の `version` を更新（例：`1.0` → `1.1` または `1.0.1`）
-2. 変更を `master` にマージ
-3. 自動デプロイが実行されます
+WXTを使用している場合、バージョンは `package.json` と `wxt.config.ts` で管理します。
+
+#### 方法1: package.json で管理（推奨）
+
+`package.json` の `version` フィールドを更新：
+
+```json
+{
+  "name": "env-color",
+  "version": "1.0.1",
+  ...
+}
+```
+
+`wxt.config.ts` で `package.json` から自動取得：
+
+```typescript
+import { defineConfig } from 'wxt';
+import pkg from './package.json';
+
+export default defineConfig({
+  manifest: {
+    version: pkg.version,
+    ...
+  }
+});
+```
+
+#### 方法2: wxt.config.ts で直接指定
+
+```typescript
+export default defineConfig({
+  manifest: {
+    version: '1.0.1',
+    ...
+  }
+});
+```
+
+### リリース手順
+
+1. バージョン番号を更新（例：`1.0.0` → `1.0.1` または `1.1.0`）
+2. 変更をコミット：`git commit -am "Bump version to 1.0.1"`
+3. タグを作成：`git tag v1.0.1`
+4. プッシュ：`git push origin master --tags`
+5. 自動デプロイが実行されます
+
+### セマンティックバージョニング
+
+- **パッチ** (1.0.0 → 1.0.1): バグ修正
+- **マイナー** (1.0.0 → 1.1.0): 新機能追加（後方互換性あり）
+- **メジャー** (1.0.0 → 2.0.0): 破壊的変更
 
 ## 参考リンク
 
