@@ -62,3 +62,7 @@ Viteを導入した後は、Chromeに読み込む拡張機能のフォルダが 
 
     このコマンドを実行後、再度Chromeの拡張機能をリロード（`chrome://extensions` のリロードボタン）してください。
     **それでも反映されない場合は、Chromeブラウザ自体を一度終了し、再起動してください。**
+
+## gemini
+
+https://github.com/google-github-actions/run-gemini-cli/blob/v0.1.14/README.md#quick-start

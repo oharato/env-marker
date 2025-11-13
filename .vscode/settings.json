@@ -1,6 +1,8 @@
-{"github.copilot.chat.commitMessageGeneration.instructions": [
-    {
-        "text": "日本語でコミットメッセージを生成してください。",
-        "language": "ja"
-    }
-]}
+{
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+        {
+            "text": "日本語でコミットメッセージを生成してください。",
+            "language": "ja"
+        }
+    ]
+}
