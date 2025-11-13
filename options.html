@@ -67,7 +67,6 @@
         border-radius: 8px;
         padding: 8px;
         margin-top: 5px;
-        max-width: 340px; /* 幅を調整 */
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
@@ -84,7 +83,21 @@
         color: #495057;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         margin: 0;
+        font-size: 13px;
+        white-space: nowrap;
+        flex: 0 0 calc(50% - 4px); /* 2 items per row by default (for ribbon options) */
+      }
+
+      /* Basic position options - 4 per row */
+      #position-options label:nth-child(n+5) {
+        flex: 0 0 calc(25% - 6px);
+      }
+
+      /* Frame option - full width */
+      #position-options label:last-child {
+        flex: 0 0 calc(25% - 6px);
       }
 
       #position-options label:hover {
@@ -117,9 +130,18 @@
   </head>
   <body>
     <h1>Env Marker Settings</h1>
+    <label for="setting-selector">Setting Profile</label>
+    <select id="setting-selector">
+      <option value="setting1">setting1</option>
+      <option value="setting2">setting2</option>
+      <option value="setting3">setting3</option>
+      <option value="setting4">setting4</option>
+      <option value="setting5">setting5</option>
+    </select>
+    
     <label>Target Patterns (URL or IP, one per line)</label>
     <textarea id="patterns" rows="6" cols="40"></textarea>
-    <label>Banner Color</label>
+    <label>Marker Color</label>
     <div style="display: flex; align-items: center; gap: 10px;">
       <input type="color" id="color" value="#ff6666" />
       <select id="color-presets">
@@ -132,20 +154,20 @@
       </select>
     </div>
 
-    <label>Banner Position</label>
-    <div id="position-options" style="max-width: 300px;">
+    <label>Marker Position</label>
+    <div id="position-options">
+      <label><input type="radio" name="position" value="top-left"> Top-Left Ribbon</label>
+      <label><input type="radio" name="position" value="top-right"> Top-Right Ribbon</label>
+      <label><input type="radio" name="position" value="bottom-left"> Bottom-Left Ribbon</label>
+      <label><input type="radio" name="position" value="bottom-right"> Bottom-Right Ribbon</label>
       <label><input type="radio" name="position" value="top" checked> Top</label>
       <label><input type="radio" name="position" value="bottom"> Bottom</label>
       <label><input type="radio" name="position" value="left"> Left</label>
       <label><input type="radio" name="position" value="right"> Right</label>
       <label><input type="radio" name="position" value="frame"> Frame</label>
-      <label><input type="radio" name="position" value="top-left"> Top-Left Ribbon</label>
-      <label><input type="radio" name="position" value="top-right"> Top-Right Ribbon</label>
-      <label><input type="radio" name="position" value="bottom-left"> Bottom-Left Ribbon</label>
-      <label><input type="radio" name="position" value="bottom-right"> Bottom-Right Ribbon</label>
     </div>
 
-    <label for="bannerSize" style="margin-top: 12px;">Banner Thickness (px)</label>
+    <label for="bannerSize" style="margin-top: 12px;">Marker Thickness (px)</label>
     <div>
       <input type="number" id="bannerSize" min="1" max="50" style="width: 70px;">
     </div>

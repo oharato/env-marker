@@ -7,16 +7,23 @@
     const url = location.href;
     console.debug('[env-marker][content] Initializing content script for:', url);
 
+    // Get current setting profile
+    const { currentSetting } = await chrome.storage.sync.get({currentSetting: 'setting1'});
+    const settingKey = currentSetting;
+
     // ストレージから全設定を取得
     const data = await chrome.storage.sync.get({
-      patterns: [],
-      color: '#ff6666',
-      bannerPosition: 'top',
-      bannerSize: 40
+      [`${settingKey}_patterns`]: [],
+      [`${settingKey}_color`]: '#ff6666',
+      [`${settingKey}_bannerPosition`]: 'top',
+      [`${settingKey}_bannerSize`]: 40
     });
     console.debug('[env-marker][content] Loaded settings on init:', data);
     
-    const { patterns, color, bannerPosition, bannerSize } = data;
+    const patterns = data[`${settingKey}_patterns`] || [];
+    const color = data[`${settingKey}_color`] || '#ff6666';
+    const bannerPosition = data[`${settingKey}_bannerPosition`] || 'top';
+    const bannerSize = data[`${settingKey}_bannerSize`] || 40;
 
     // パターンにマッチするかチェック
     const matchedPattern = patterns.find(pattern => {
@@ -41,7 +48,7 @@
     }
 
     // マッチした場合はバナー表示
-    console.info('[env-marker][content] Pattern matched. Showing banner.', { matchedPattern, ...data });
+    console.info('[env-marker][content] Pattern matched. Showing banner.', { matchedPattern, color, bannerPosition, bannerSize });
     showBanner(matchedPattern, color, bannerPosition, bannerSize);
   } catch (e) {
     console.error(e);
@@ -188,8 +195,18 @@ function setFavicon(color) {
 chrome.runtime.onMessage.addListener(async (msg) => {
   console.debug('[env-marker][content] Received message:', msg);
   if (msg && msg.type === 'show-env-marker-banner' && msg.text) {
-    const data = await chrome.storage.sync.get({ bannerPosition: 'top', bannerSize: 4 });
-    console.info('[env-marker][content] Message requests banner. Loaded data:', data);
-    showBanner(msg.text, msg.color, data.bannerPosition, data.bannerSize);
+    // Get current setting profile
+    const { currentSetting } = await chrome.storage.sync.get({currentSetting: 'setting1'});
+    const settingKey = currentSetting;
+    
+    const data = await chrome.storage.sync.get({ 
+      [`${settingKey}_bannerPosition`]: 'top',
+      [`${settingKey}_bannerSize`]: 4
+    });
+    const bannerPosition = data[`${settingKey}_bannerPosition`] || 'top';
+    const bannerSize = data[`${settingKey}_bannerSize`] || 4;
+    
+    console.info('[env-marker][content] Message requests banner. Loaded data:', { bannerPosition, bannerSize });
+    showBanner(msg.text, msg.color, bannerPosition, bannerSize);
   }
 });
