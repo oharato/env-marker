@@ -67,7 +67,6 @@
         border-radius: 8px;
         padding: 8px;
         margin-top: 5px;
-        max-width: 100%; /* 幅を調整 */
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
@@ -128,7 +127,7 @@
     
     <label>Target Patterns (URL or IP, one per line)</label>
     <textarea id="patterns" rows="6" cols="40"></textarea>
-    <label>Banner Color</label>
+    <label>Marker Color</label>
     <div style="display: flex; align-items: center; gap: 10px;">
       <input type="color" id="color" value="#ff6666" />
       <select id="color-presets">
@@ -141,7 +140,7 @@
       </select>
     </div>
 
-    <label>Banner Position</label>
+    <label>Marker Position</label>
     <div id="position-options">
       <label><input type="radio" name="position" value="top" checked> Top</label>
       <label><input type="radio" name="position" value="bottom"> Bottom</label>
@@ -154,7 +153,7 @@
       <label><input type="radio" name="position" value="bottom-right"> Bottom-Right Ribbon</label>
     </div>
 
-    <label for="bannerSize" style="margin-top: 12px;">Banner Thickness (px)</label>
+    <label for="bannerSize" style="margin-top: 12px;">Marker Thickness (px)</label>
     <div>
       <input type="number" id="bannerSize" min="1" max="50" style="width: 70px;">
     </div>
