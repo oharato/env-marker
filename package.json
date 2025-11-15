@@ -1,11 +1,11 @@
 {
   "name": "env-color",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "指定したURLやIPアドレスのサイトを開いたときに、視覚的に識別しやすくするためのChrome拡張。",
   "main": "background.js",
   "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build"
+    "dev": "wxt",
+    "build": "wxt build"
   },
   "repository": {
     "type": "git",
@@ -18,8 +18,17 @@
     "url": "https://github.com/oharato/env-marker/issues"
   },
   "homepage": "https://github.com/oharato/env-marker#readme",
+  "packageManager": "pnpm@10.4.1+sha1.ec73125afa7b740b8fcafeab681883c7ec791a4b",
   "devDependencies": {
-    "vite": "^7.2.2",
-    "vite-plugin-web-extension": "^4.5.0"
+    "sharp": "^0.34.5",
+    "typescript": "^5.9.3",
+    "wxt": "^0.20.11"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "spawn-sync"
+    ]
   }
 }
