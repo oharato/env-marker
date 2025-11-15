@@ -4,7 +4,7 @@ Generate icon images for Chrome extension
 Creates 16x16, 48x48, and 128x128 PNG icons
 """
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import os
 
 def create_icon(size):
