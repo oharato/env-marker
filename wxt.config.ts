@@ -1,9 +1,10 @@
 import { defineConfig } from 'wxt';
+import pkg from './package.json';
 
 export default defineConfig({
   manifest: {
     name: 'Env Marker',
-    version: '1.0', // package.json の version を使うことも可能
+    version: pkg.version,
     description: '指定したURLやIPアドレスのサイトに目印をつけます',
     permissions: ['storage', 'webRequest'],
     icons: {
