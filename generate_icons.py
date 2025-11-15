@@ -15,7 +15,6 @@ def create_icon(size):
     
     # Calculate dimensions
     padding = size // 10
-    radius = size // 2 - padding
     center = size // 2
     
     # Draw a colored circle background
