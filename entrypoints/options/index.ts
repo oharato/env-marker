@@ -104,7 +104,7 @@ async function save(): Promise<void> {
   if (!settingSelectorEl || !patternsEl || !colorEl || !bannerSizeEl || !enabledEl || !settingNameEl) return;
 
   const currentSetting = settingSelectorEl.value;
-  const patterns = patternsEl.value.split(/\n/).filter(Boolean);
+  const patterns = patternsEl.value.split(/\s+/).filter(Boolean);
   const color = colorEl.value;
   const enabled = enabledEl.checked;
   const name = settingNameEl.value.trim();
