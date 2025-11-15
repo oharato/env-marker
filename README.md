@@ -1,4 +1,5 @@
 # Env Marker
+![screenshot](public/screenshot01_resized.png)
 
 指定したURLやIPアドレスのサイトを開いたときに、視覚的に識別しやすくするためのChrome拡張機能です。
 
