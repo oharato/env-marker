@@ -9,7 +9,7 @@ export function containsIPv6(str: string): boolean {
   // Remove URL brackets if present
   const cleaned = str.replace(/\[|\]/g, '');
   
-  // Check for :: (compressed notation) or multiple : with hex characters
+  // Check for :: (compressed notation) - definitely IPv6
   if (cleaned.includes('::')) return true;
   
   // Count colons - IPv6 should have at least 2 colons (even when compressed)
@@ -18,6 +18,19 @@ export function containsIPv6(str: string): boolean {
     // Check if it contains hex characters typical of IPv6
     // IPv6 uses 0-9, a-f, A-F
     return /^[0-9a-fA-F:]+$/.test(cleaned.split('/')[0].split('?')[0]);
+  }
+  
+  // Special case: single colon with hex digits on both sides might be partial IPv6
+  // This handles patterns like "2001:db8" which users might use to match IPv6 addresses
+  if (colonCount === 1) {
+    const parts = cleaned.split(':');
+    // Check if both parts look like hex (IPv6 groups)
+    // IPv6 groups are 1-4 hex digits
+    if (parts.length === 2 && 
+        /^[0-9a-fA-F]{1,4}$/.test(parts[0]) && 
+        /^[0-9a-fA-F]{1,4}$/.test(parts[1])) {
+      return true;
+    }
   }
   
   return false;
