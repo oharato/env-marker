@@ -43,12 +43,21 @@ api.*.example.com        # api.dev.example.com、api.staging.example.com など�
 https://example.com      # HTTPSのexample.comのみ
 localhost:3000           # ポート3000を指定
 /admin                   # /adminを含むパス
+
+# IPv6アドレス（圧縮表記と完全表記の両方に対応）
+::1                      # IPv6ローカルホスト（圧縮表記）
+fe80::1                  # リンクローカルアドレス（圧縮表記）
+2001:db8::1              # 圧縮表記のIPv6アドレス
+2001:0db8:85a3:0000:0000:8a2e:0370:7334  # 完全表記のIPv6アドレス
+[::1]                    # URLに含まれるIPv6アドレス（ブラケット付き）
 ```
 
 ### マッチング対象
 
 - **content.ts**: ページのURL全体（`location.href`）に対してパターンマッチング
-- **background.ts**: webRequest APIで取得した接続先IPアドレスにもパターンマッチング
+- **background.ts**: webRequest APIで取得した接続先IPアドレス（IPv4/IPv6）にもパターンマッチング
+
+**IPv6対応について**: IPv6アドレスは圧縮表記（`::`を使った短縮形）と完全表記の両方をサポートしています。パターンを圧縮表記で書いても、完全表記のIPv6アドレスに正しくマッチします（逆も同様）。
 
 空行は無視されます。
 
