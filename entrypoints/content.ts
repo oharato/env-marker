@@ -1,3 +1,5 @@
+import { normalizeIPv6ForMatching } from '../utils/ipv6-utils';
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_start',
@@ -38,13 +40,17 @@ export default defineContentScript({
         const matchedPattern = patterns.find((pattern: string) => {
           if (pattern.trim() === '') return false;
           try {
+            // Normalize IPv6 addresses for consistent matching
+            const normalizedPattern = normalizeIPv6ForMatching(pattern);
+            const normalizedUrl = normalizeIPv6ForMatching(url);
+            
             // アスタリスク(*)を正規表現の(.*)に変換し、他の正規表現特殊文字をエスケープ
-            const regexPattern = pattern
+            const regexPattern = normalizedPattern
               .replace(/[.+?^${}()|[\\]/g, '\\$&') // . や + などの文字をエスケープ
               .replace(/\*/g, '.*'); // アスタリスクをワイルドカードに変換
             
-            const regex = new RegExp(regexPattern);
-            return regex.test(url);
+            const regex = new RegExp(regexPattern, 'i');
+            return regex.test(normalizedUrl);
           } catch (e) {
             console.error(`[env-marker] Invalid regex pattern from user input: "${pattern}"`, e);
             return false;
