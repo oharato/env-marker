@@ -1,9 +1,11 @@
 // options.ts
-'use strict';
+"use strict";
+import ip6 from 'ip6';
 
 const settingSelectorEl = document.getElementById('setting-selector') as HTMLSelectElement | null;
 const settingNameEl = document.getElementById('setting-name') as HTMLInputElement | null;
 const patternsEl = document.getElementById('patterns') as HTMLTextAreaElement | null;
+const patternHelpEl = document.getElementById('pattern-help') as HTMLElement | null;
 const colorEl = document.getElementById('color') as HTMLInputElement | null;
 const colorPresetsEl = document.getElementById('color-presets') as HTMLSelectElement | null;
 const bannerSizeEl = document.getElementById('bannerSize') as HTMLInputElement | null;
@@ -100,7 +102,72 @@ async function loadSettingProfile(settingKey: string): Promise<void> {
   }
 }
 
+// Validate a single pattern line and return error message or null
+function validatePatternLine(line: string): string | null {
+  if (!line || line.trim() === '') return null;
+  // URL
+  if (/^https?:\/\//i.test(line)) {
+    try {
+      new URL(line);
+      return null;
+    } catch (e) {
+      return 'Invalid URL';
+    }
+  }
+
+  // IPv6 or CIDR
+  if (line.includes(':') && !line.includes('*')) {
+    if (line.includes('/')) {
+      const [addr, mask] = line.split('/');
+      const m = parseInt(mask, 10);
+      if (Number.isNaN(m) || m < 0 || m > 128) return 'Invalid CIDR mask';
+      try {
+        ip6.validate(addr);
+        return null;
+      } catch (e) {
+        return 'Invalid IPv6 address in CIDR';
+      }
+    } else {
+      try {
+        ip6.validate(line);
+        return null;
+      } catch (e) {
+        return 'Invalid IPv6 address';
+      }
+    }
+  }
+
+  // allow wildcard patterns containing *
+  if (line.includes('*')) return null;
+
+  // otherwise assume it's a hostname or simple pattern — basic validation
+  if (/^[a-z0-9.-]+$/i.test(line)) return null;
+  return 'Unrecognized pattern format';
+}
+
 async function save(): Promise<void> {
+  // validate patterns before saving
+  if (patternsEl) {
+    const lines = patternsEl.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const invalids: string[] = [];
+    for (const l of lines) {
+      const msg = validatePatternLine(l);
+      if (msg) invalids.push(`${l} — ${msg}`);
+    }
+    if (invalids.length > 0) {
+      if (patternHelpEl) {
+        patternHelpEl.style.color = '#d9534f';
+        patternHelpEl.textContent = `Invalid patterns:\n${invalids.join('\n')}`;
+      }
+      // Do not save if invalid patterns exist
+      return;
+    } else {
+      if (patternHelpEl) {
+        patternHelpEl.style.color = '#6c757d';
+        patternHelpEl.textContent = 'Patterns look OK.';
+      }
+    }
+  }
   if (!settingSelectorEl || !patternsEl || !colorEl || !bannerSizeEl || !enabledEl || !settingNameEl) return;
 
   const currentSetting = settingSelectorEl.value;
@@ -158,13 +225,15 @@ async function notifyAllTabs(): Promise<void> {
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
       if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
-        // タブをリロード
-        chrome.tabs.reload(tab.id).catch(() => {
-          // エラーは無視（タブが閉じられた場合など）
-        });
+        try {
+          // 通常は content script が常駐しているため reload ではなくメッセージを送る
+          chrome.tabs.sendMessage(tab.id, { type: 'env-marker-settings-changed' });
+        } catch (e) {
+          // sendMessage が失敗する場合（コンテンツスクリプト未登録など）は無視
+        }
       }
     }
-    console.debug('[env-marker][options] Notified all tabs to reload');
+    console.debug('[env-marker][options] Notified all tabs of settings change');
   } catch (e) {
     console.error('[env-marker][options] Failed to notify tabs:', e);
   }

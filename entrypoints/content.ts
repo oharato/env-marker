@@ -1,4 +1,4 @@
-import { normalizeIPv6ForMatching } from '../utils/ipv6-utils';
+import { matchesPattern } from '../src/ipMatcher';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -8,75 +8,88 @@ export default defineContentScript({
     // ページのロード時にすべての有効な設定をチェックし、マッチするものがあればマーカーを表示する
     try {
       const host = location.hostname;
+      // --- temporary global error handlers for debugging SVG path errors ---
+      try {
+        window.addEventListener('error', (ev: ErrorEvent) => {
+          try {
+            console.error('[env-marker][content][dbg] window.onerror', ev.message, ev.filename, ev.lineno, ev.colno, ev.error && ev.error.stack);
+            const paths = Array.from(document.querySelectorAll('path')).slice(0, 20).map(p => ({ d: p.getAttribute('d'), outer: (p.outerHTML || '').slice(0, 300) }));
+            console.debug('[env-marker][content][dbg] paths sample', paths);
+            const target = ev && (ev as any).target;
+            if (target && target instanceof Element) {
+              try { console.debug('[env-marker][content][dbg] error target outerHTML', (target.outerHTML || '').slice(0, 800)); } catch(e) {}
+            }
+          } catch (e) {
+            console.error('[env-marker][content][dbg] handler error', e);
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', (ev: PromiseRejectionEvent) => {
+          try {
+            const reason = (ev && (ev as any).reason) || ev;
+            console.error('[env-marker][content][dbg] unhandledrejection', reason && (reason.stack || reason));
+            const paths = Array.from(document.querySelectorAll('path')).slice(0, 20).map(p => ({ d: p.getAttribute('d'), outer: (p.outerHTML || '').slice(0, 300) }));
+            console.debug('[env-marker][content][dbg] paths sample', paths);
+          } catch (e) {
+            console.error('[env-marker][content][dbg] unhandledrejection handler error', e);
+          }
+        }, true);
+      } catch (e) {
+        console.error('[env-marker][content][dbg] failed to attach global handlers', e);
+      }
+      // --- end temporary handlers ---
       const url = location.href;
       console.debug('[env-marker][content] Initializing content script for:', url);
 
-      // すべての設定プロファイルをチェック
-      const allSettings = ['setting1', 'setting2', 'setting3', 'setting4', 'setting5'];
-      let matchedSetting: { pattern: string; color: string; position: string; size: number } | null = null;
-
-      for (const settingKey of allSettings) {
-        // ストレージから設定を取得
-        const data = await chrome.storage.sync.get({
-          [`${settingKey}_patterns`]: [],
-          [`${settingKey}_color`]: '#ff6666',
-          [`${settingKey}_bannerPosition`]: 'top',
-          [`${settingKey}_bannerSize`]: 40,
-          [`${settingKey}_enabled`]: true
-        });
-        
-        const enabled = data[`${settingKey}_enabled`];
-        if (!enabled) {
-          console.debug(`[env-marker][content] ${settingKey} is disabled, skipping`);
-          continue;
-        }
-
-        const patterns = data[`${settingKey}_patterns`] || [];
-        const color = data[`${settingKey}_color`] || '#ff6666';
-        const bannerPosition = data[`${settingKey}_bannerPosition`] || 'top';
-        const bannerSize = data[`${settingKey}_bannerSize`] || 40;
-
-        // パターンにマッチするかチェック
-        const matchedPattern = patterns.find((pattern: string) => {
-          if (pattern.trim() === '') return false;
+      // Ensure we can receive messages from background even if main() returns early
+      try {
+        chrome.runtime.onMessage.addListener((msg: any) => {
           try {
-            // Normalize IPv6 addresses for consistent matching
-            const normalizedPattern = normalizeIPv6ForMatching(pattern);
-            const normalizedUrl = normalizeIPv6ForMatching(url);
-            
-            // アスタリスク(*)を正規表現の(.*)に変換し、他の正規表現特殊文字をエスケープ
-            const regexPattern = normalizedPattern
-              .replace(/[.+?^${}()|[\\]/g, '\\$&') // . や + などの文字をエスケープ
-              .replace(/\*/g, '.*'); // アスタリスクをワイルドカードに変換
-            
-            const regex = new RegExp(regexPattern, 'i');
-            return regex.test(normalizedUrl);
+            console.debug('[env-marker][content] Early Received message:', msg);
+            if (msg && msg.type === 'show-env-marker-banner' && msg.text) {
+              // Prefer position/size provided in the message (injected helper/background)
+              // If not present, fall back to reading storage. Use an async IIFE so we
+              // don't block the message channel synchronously.
+              (async () => {
+                try {
+                  const msgColor = (msg && msg.color) ? String(msg.color) : '#ff6666';
+                  const msgText = msg && msg.text ? String(msg.text) : '';
+                  let position: string | undefined = msg.position as any;
+                  let size: number | undefined = msg.size as any;
+                  if (!position || !size) {
+                    const { currentSetting } = await chrome.storage.sync.get({ currentSetting: 'setting1' });
+                    const data = await chrome.storage.sync.get({
+                      [`${currentSetting}_bannerPosition`]: 'top',
+                      [`${currentSetting}_bannerSize`]: 40
+                    });
+                    const dataAny = data as any;
+                    position = position || (dataAny[`${currentSetting}_bannerPosition`] as string) || 'top';
+                    size = size || (dataAny[`${currentSetting}_bannerSize`] as number) || 40;
+                  }
+                  showBanner(msgText, msgColor, position as string, size as number);
+                } catch (e) {
+                  console.error('[env-marker][content] early listener async handler error', e);
+                }
+              })();
+            }
+            // If options page notifies settings changed, update existing banner without reload
+            if (msg && msg.type === 'env-marker-settings-changed') {
+              try {
+                updateBannerFromStorageForLast();
+              } catch (e) {
+                console.error('[env-marker][content] failed to handle settings-changed message', e);
+              }
+            }
           } catch (e) {
-            console.error(`[env-marker] Invalid regex pattern from user input: "${pattern}"`, e);
-            return false;
+            console.error('[env-marker][content] early listener error', e);
           }
         });
-
-        if (matchedPattern) {
-          console.info(`[env-marker][content] Matched with ${settingKey}:`, matchedPattern);
-          matchedSetting = {
-            pattern: matchedPattern,
-            color: color,
-            position: bannerPosition,
-            size: bannerSize
-          };
-          break; // 最初にマッチした設定を使用
-        }
+      } catch (e) {
+        console.error('[env-marker][content] failed to attach early onMessage listener', e);
       }
 
-      if (!matchedSetting) {
-        console.debug('[env-marker][content] No pattern matched.');
-        return;
-      }
-
-      // マッチした場合はバナー表示
-      console.info('[env-marker][content] Pattern matched. Showing banner.', matchedSetting);
-      showBanner(matchedSetting.pattern, matchedSetting.color, matchedSetting.position, matchedSetting.size);
+      // Evaluate patterns and show banner if needed
+      await evaluatePatternsAndShow();
     } catch (e) {
       console.error(e);
     }
@@ -93,13 +106,52 @@ export default defineContentScript({
           [`${settingKey}_bannerPosition`]: 'top',
           [`${settingKey}_bannerSize`]: 4
         });
-        const bannerPosition = data[`${settingKey}_bannerPosition`] || 'top';
-        const bannerSize = data[`${settingKey}_bannerSize`] || 4;
+        const dataAny = data as any;
+        const bannerPosition = (dataAny[`${settingKey}_bannerPosition`] as string) || 'top';
+        const bannerSize = (dataAny[`${settingKey}_bannerSize`] as number) || 4;
         
         console.info('[env-marker][content] Message requests banner. Loaded data:', { bannerPosition, bannerSize });
-        showBanner(msg.text, msg.color, bannerPosition, bannerSize);
+        const msgColor = (msg && msg.color) ? String(msg.color) : '#ff6666';
+        const msgText = msg && msg.text ? String(msg.text) : '';
+        showBanner(msgText, msgColor, bannerPosition, bannerSize);
       }
     });
+
+    // Evaluate all settings for current URL and show banner if a pattern matches
+    async function evaluatePatternsAndShow() {
+      try {
+        const url = location.href;
+        const allSettings = ['setting1', 'setting2', 'setting3', 'setting4', 'setting5'];
+        for (const settingKey of allSettings) {
+          const data = await chrome.storage.sync.get({
+            [`${settingKey}_patterns`]: [],
+            [`${settingKey}_color`]: '#ff6666',
+            [`${settingKey}_bannerPosition`]: 'top',
+            [`${settingKey}_bannerSize`]: 40,
+            [`${settingKey}_enabled`]: true
+          });
+          const dataAny = data as any;
+          const enabled = dataAny[`${settingKey}_enabled`];
+          if (!enabled) continue;
+
+          const patterns = (dataAny[`${settingKey}_patterns`] as string[]) || [];
+          const color = (dataAny[`${settingKey}_color`] as string) || '#ff6666';
+          const bannerPosition = (dataAny[`${settingKey}_bannerPosition`] as string) || 'top';
+          const bannerSize = (dataAny[`${settingKey}_bannerSize`] as number) || 40;
+
+          const matchedPattern = patterns.find((pattern: string) => matchesPattern(pattern, undefined, url));
+
+          if (matchedPattern) {
+            console.info('[env-marker][content] Pattern matched. Showing banner.', { settingKey, matchedPattern });
+            showBanner(matchedPattern, color, bannerPosition, bannerSize);
+            return;
+          }
+        }
+        console.debug('[env-marker][content] No pattern matched.');
+      } catch (e) {
+        console.error('[env-marker][content] evaluatePatternsAndShow error', e);
+      }
+    }
   },
 });
 
@@ -111,6 +163,8 @@ function showBanner(text: string, color: string, position: string, size: number)
     if (!banner) {
       banner = document.createElement('div');
       banner.id = 'env-marker-banner';
+      // create hidden initially to avoid layout flicker while styles are applied
+      banner.style.visibility = 'hidden';
       document.documentElement.appendChild(banner);
       // バナーが新しく作成されたときに一度だけイベントリスナーを追加
       banner.addEventListener('click', () => {
@@ -214,9 +268,113 @@ function showBanner(text: string, color: string, position: string, size: number)
     
     // ファビコン
     setFavicon(color);
+
+    // Styles applied, show the banner to avoid initial flicker
+    try {
+      banner.style.visibility = 'visible';
+    } catch (e) {}
+    // remember last shown banner info so storage changes can update it without reload
+    try {
+      (window as any).__env_marker_lastBanner = { text, color, position, size };
+    } catch (e) {}
   } catch (e) {
     console.error(e);
   }
+}
+
+// Update an existing banner based on current storage for the matching pattern
+async function updateBannerFromStorageForLast() {
+  try {
+    const last = (window as any).__env_marker_lastBanner;
+    if (!last || !last.text) return;
+    // load all settings and find which one contains the pattern text
+    const allSettings = ['setting1', 'setting2', 'setting3', 'setting4', 'setting5'];
+    for (const key of allSettings) {
+      const data = await chrome.storage.sync.get({
+        [`${key}_patterns`]: [],
+        [`${key}_color`]: '#ff6666',
+        [`${key}_bannerPosition`]: 'top',
+        [`${key}_bannerSize`]: 40,
+      });
+      const any = data as any;
+      const patterns: string[] = any[`${key}_patterns`] || [];
+      if (patterns.find(p => p === last.text)) {
+        const color = (any[`${key}_color`] as string) || last.color || '#ff6666';
+        const position = (any[`${key}_bannerPosition`] as string) || last.position || 'top';
+        const size = (any[`${key}_bannerSize`] as number) || last.size || 40;
+        // apply to existing banner without recreating to avoid flicker
+        const banner = document.getElementById('env-marker-banner');
+        if (!banner) return;
+        try {
+          // reuse the same styling logic from showBanner but only update styles
+          banner.style.transition = 'none';
+          banner.style.background = color;
+          // ribbon vs bar
+          const isRibbon = position.includes('-left') || position.includes('-right');
+          if (isRibbon) {
+            banner.style.width = '200px';
+            banner.style.padding = '4px 0';
+            banner.style.textAlign = 'center';
+            banner.style.color = 'white';
+            banner.style.fontSize = '14px';
+            banner.style.fontWeight = 'bold';
+            banner.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+            banner.textContent = last.text;
+            banner.style.top = '';
+            banner.style.bottom = '';
+            banner.style.left = '';
+            banner.style.right = '';
+            banner.style.transform = '';
+            switch (position) {
+              case 'top-right': banner.style.top = '25px'; banner.style.right = '-50px'; banner.style.transform = 'rotate(45deg)'; break;
+              case 'top-left': banner.style.top = '25px'; banner.style.left = '-50px'; banner.style.transform = 'rotate(-45deg)'; break;
+              case 'bottom-right': banner.style.bottom = '25px'; banner.style.right = '-50px'; banner.style.transform = 'rotate(-45deg)'; break;
+              case 'bottom-left': banner.style.bottom = '25px'; banner.style.left = '-50px'; banner.style.transform = 'rotate(45deg)'; break;
+            }
+          } else {
+            const bannerSize = `${size}px`;
+            // clear ribbon placements
+            banner.style.top = '';
+            banner.style.bottom = '';
+            banner.style.left = '';
+            banner.style.right = '';
+            banner.style.transform = '';
+            switch (position) {
+              case 'bottom': banner.style.bottom = '0'; banner.style.left = '0'; banner.style.width = '100%'; banner.style.height = bannerSize; break;
+              case 'left': banner.style.top = '0'; banner.style.left = '0'; banner.style.width = bannerSize; banner.style.height = '100vh'; break;
+              case 'right': banner.style.top = '0'; banner.style.right = '0'; banner.style.width = bannerSize; banner.style.height = '100vh'; break;
+              case 'frame': banner.style.top = '0'; banner.style.left = '0'; banner.style.width = '100vw'; banner.style.height = '100vh'; banner.style.border = `${bannerSize} solid ${color}`; banner.style.boxSizing = 'border-box'; break;
+              case 'top': default: banner.style.top = '0'; banner.style.left = '0'; banner.style.width = '100%'; banner.style.height = bannerSize; break;
+            }
+          }
+          // update favicon/title
+          try { setFavicon(color); } catch (e) {}
+          try { document.title = `[${last.text}] ${document.title.replace(/\[.*?\]\s*/, '')}`; } catch (e) {}
+          // update remembered values
+          (window as any).__env_marker_lastBanner = { text: last.text, color, position, size };
+        } catch (e) {
+          console.error('[env-marker][content] updateBannerFromStorageForLast error', e);
+        }
+        return;
+      }
+    }
+  } catch (e) {
+    console.error('[env-marker][content] updateBannerFromStorageForLast failed', e);
+  }
+}
+
+// Listen for storage changes and update the banner when relevant
+try {
+  chrome.storage.onChanged.addListener((changes: { [key: string]: chrome.storage.StorageChange }, namespace: string) => {
+    try {
+      // call update which will find the matching setting by pattern
+      updateBannerFromStorageForLast();
+    } catch (e) {
+      console.error('[env-marker][content] storage.onChanged handler error', e);
+    }
+  });
+} catch (e) {
+  console.error('[env-marker][content] failed to attach storage.onChanged listener', e);
 }
 
 // ファビコン生成

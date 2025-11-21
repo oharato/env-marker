@@ -5,7 +5,8 @@
   "main": "background.js",
   "scripts": {
     "dev": "wxt",
-    "build": "wxt build"
+    "build": "wxt build",
+    "resize-screenshots": "node scripts/resize_screenshots.mjs"
   },
   "repository": {
     "type": "git",
@@ -20,8 +21,14 @@
   "homepage": "https://github.com/oharato/env-marker#readme",
   "packageManager": "pnpm@10.4.1+sha1.ec73125afa7b740b8fcafeab681883c7ec791a4b",
   "devDependencies": {
+    "@types/assert": "^1.5.11",
+    "@types/chrome": "^0.1.31",
+    "@types/node": "^24.10.1",
+    "assert": "^2.1.0",
     "sharp": "^0.34.5",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
+    "vitest": "^4.0.12",
     "wxt": "^0.20.11"
   },
   "pnpm": {
@@ -30,5 +37,8 @@
       "sharp",
       "spawn-sync"
     ]
+  },
+  "dependencies": {
+    "ip6": "^0.2.11"
   }
 }
