@@ -5,7 +5,7 @@
   "main": "background.js",
   "scripts": {
     "dev": "wxt",
-    "build": "wxt build",
+    "build": "rm -r .output/chrome-mv3 && wxt build",
     "resize-screenshots": "node scripts/resize_screenshots.mjs"
   },
   "repository": {

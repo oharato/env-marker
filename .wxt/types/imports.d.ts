@@ -5,7 +5,7 @@ declare global {
   const InvalidMatchPattern: typeof import('wxt/utils/match-patterns').InvalidMatchPattern
   const MatchPattern: typeof import('wxt/utils/match-patterns').MatchPattern
   const browser: typeof import('wxt/browser').browser
-  const containsIPv6: typeof import('/home/runner/work/env-marker/env-marker/utils/ipv6-utils').containsIPv6
+  const containsIPv6: typeof import('/home/oharato/workspace/tmp/env-color/utils/ipv6-utils').containsIPv6
   const createIframeUi: typeof import('wxt/utils/content-script-ui/iframe').createIframeUi
   const createIntegratedUi: typeof import('wxt/utils/content-script-ui/integrated').createIntegratedUi
   const createShadowRootUi: typeof import('wxt/utils/content-script-ui/shadow-root').createShadowRootUi
@@ -14,10 +14,10 @@ declare global {
   const defineContentScript: typeof import('wxt/utils/define-content-script').defineContentScript
   const defineUnlistedScript: typeof import('wxt/utils/define-unlisted-script').defineUnlistedScript
   const defineWxtPlugin: typeof import('wxt/utils/define-wxt-plugin').defineWxtPlugin
-  const expandIPv6: typeof import('/home/runner/work/env-marker/env-marker/utils/ipv6-utils').expandIPv6
+  const expandIPv6: typeof import('/home/oharato/workspace/tmp/env-color/utils/ipv6-utils').expandIPv6
   const fakeBrowser: typeof import('wxt/testing').fakeBrowser
   const injectScript: typeof import('wxt/utils/inject-script').injectScript
-  const normalizeIPv6ForMatching: typeof import('/home/runner/work/env-marker/env-marker/utils/ipv6-utils').normalizeIPv6ForMatching
+  const normalizeIPv6ForMatching: typeof import('/home/oharato/workspace/tmp/env-color/utils/ipv6-utils').normalizeIPv6ForMatching
   const storage: typeof import('wxt/utils/storage').storage
   const useAppConfig: typeof import('wxt/utils/app-config').useAppConfig
 }

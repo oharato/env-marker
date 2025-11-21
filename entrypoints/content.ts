@@ -75,7 +75,12 @@ export default defineContentScript({
             // If options page notifies settings changed, update existing banner without reload
             if (msg && msg.type === 'env-marker-settings-changed') {
               try {
-                updateBannerFromStorageForLast();
+                // If message contains a payload (patterns/color/position/size), apply immediately
+                if (msg.patterns || msg.settingKey) {
+                  applySettingsPayload(msg);
+                } else {
+                  updateBannerFromStorageForLast();
+                }
               } catch (e) {
                 console.error('[env-marker][content] failed to handle settings-changed message', e);
               }
@@ -170,6 +175,9 @@ function showBanner(text: string, color: string, position: string, size: number)
       banner.addEventListener('click', () => {
         const b = document.getElementById('env-marker-banner');
         if (b) b.remove();
+        // also remove close button if present
+        const c = document.getElementById('env-marker-frame-close');
+        if (c) c.remove();
       });
     }
 
@@ -248,6 +256,11 @@ function showBanner(text: string, color: string, position: string, size: number)
           banner.style.height = '100vh';
           banner.style.border = `${bannerSize} solid ${bannerColor}`;
           banner.style.boxSizing = 'border-box';
+          // Don't block page interactions: make the banner itself non-interactive,
+          // but create four clickable border strips so clicking the frame removes it.
+          banner.style.pointerEvents = 'none';
+          banner.style.background = 'transparent';
+          createFrameBorderClickers(bannerColor, size);
           break;
         case 'top':
         default:
@@ -273,12 +286,125 @@ function showBanner(text: string, color: string, position: string, size: number)
     try {
       banner.style.visibility = 'visible';
     } catch (e) {}
+    // If not a frame overlay, ensure any frame-close button is removed and banner allows interactions
+    try {
+      if (position !== 'frame') {
+        banner.style.pointerEvents = 'auto';
+        removeFrameCloseButton();
+      }
+    } catch (e) {}
     // remember last shown banner info so storage changes can update it without reload
     try {
-      (window as any).__env_marker_lastBanner = { text, color, position, size };
+      (window as any).__env_marker_lastBanner = { text, color, position, size, timestamp: Date.now() };
     } catch (e) {}
   } catch (e) {
     console.error(e);
+  }
+}
+
+// Apply an incoming settings-change payload immediately if possible
+function applySettingsPayload(msg: any) {
+  try {
+    if (!msg) return;
+    const now = msg.timestamp || Date.now();
+    const last = (window as any).__env_marker_lastBanner || {};
+    // ignore stale messages
+    if (last.timestamp && msg.timestamp && msg.timestamp < last.timestamp) return;
+
+    const banner = document.getElementById('env-marker-banner');
+
+    // If there's an existing banner and the message contains patterns that include
+    // the currently shown text, update the banner inline using the provided values.
+    if (banner && last && last.text && Array.isArray(msg.patterns) && msg.patterns.find((p: string) => p === last.text)) {
+      try {
+        const color = msg.color || last.color || '#ff6666';
+        const position = msg.bannerPosition || last.position || 'top';
+        const size = msg.bannerSize || last.size || 4;
+
+        banner.style.transition = 'none';
+        banner.style.background = color;
+
+        const isRibbon = position.includes('-left') || position.includes('-right');
+        if (isRibbon) {
+          banner.style.width = '200px';
+          banner.style.padding = '4px 0';
+          banner.style.textAlign = 'center';
+          banner.style.color = 'white';
+          banner.style.fontSize = '14px';
+          banner.style.fontWeight = 'bold';
+          banner.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+          banner.textContent = last.text;
+          banner.style.top = '';
+          banner.style.bottom = '';
+          banner.style.left = '';
+          banner.style.right = '';
+          banner.style.transform = '';
+          // clear bar/frame specific styles that may remain
+          banner.style.height = '';
+          banner.style.border = '';
+          banner.style.boxSizing = '';
+          banner.style.width = '200px';
+          switch (position) {
+            case 'top-right': banner.style.top = '25px'; banner.style.right = '-50px'; banner.style.transform = 'rotate(45deg)'; break;
+            case 'top-left': banner.style.top = '25px'; banner.style.left = '-50px'; banner.style.transform = 'rotate(-45deg)'; break;
+            case 'bottom-right': banner.style.bottom = '25px'; banner.style.right = '-50px'; banner.style.transform = 'rotate(-45deg)'; break;
+            case 'bottom-left': banner.style.bottom = '25px'; banner.style.left = '-50px'; banner.style.transform = 'rotate(45deg)'; break;
+          }
+        } else {
+          const bannerSize = `${size}px`;
+          // clear ribbon placements
+          banner.style.top = '';
+          banner.style.bottom = '';
+          banner.style.left = '';
+          banner.style.right = '';
+          banner.style.transform = '';
+          // clear ribbon-specific styles that may remain
+          banner.style.padding = '';
+          banner.style.textAlign = '';
+          banner.style.color = '';
+          banner.style.fontSize = '';
+          banner.style.fontWeight = '';
+          banner.style.boxShadow = '';
+          banner.textContent = '';
+          switch (position) {
+            case 'bottom': banner.style.bottom = '0'; banner.style.left = '0'; banner.style.width = '100%'; banner.style.height = bannerSize; break;
+            case 'left': banner.style.top = '0'; banner.style.left = '0'; banner.style.width = bannerSize; banner.style.height = '100vh'; break;
+            case 'right': banner.style.top = '0'; banner.style.right = '0'; banner.style.width = bannerSize; banner.style.height = '100vh'; break;
+            case 'frame': banner.style.top = '0'; banner.style.left = '0'; banner.style.width = '100vw'; banner.style.height = '100vh'; banner.style.border = `${bannerSize} solid ${color}`; banner.style.boxSizing = 'border-box'; banner.style.pointerEvents = 'none'; banner.style.background = 'transparent'; createFrameBorderClickers(color, size); break;
+            case 'top': banner.style.top = '0'; banner.style.left = '0'; banner.style.width = '100%'; banner.style.height = bannerSize; break;
+            default: break;
+          }
+          if (position !== 'frame') removeFrameCloseButton();
+        }
+
+        try { setFavicon(color); } catch (e) {}
+        try { document.title = `[${last.text}] ${document.title.replace(/\[.*?\]\s*/, '')}`; } catch (e) {}
+        (window as any).__env_marker_lastBanner = { text: last.text, color, position, size, timestamp: now };
+      } catch (e) {
+        console.error('[env-marker][content] applySettingsPayload update existing banner error', e);
+      }
+      return;
+    }
+
+    // If no banner exists (or it wasn't the same pattern), try to find a pattern that matches
+    // the current URL from the provided patterns and show it immediately.
+    if (Array.isArray(msg.patterns) && msg.patterns.length > 0) {
+      try {
+        const url = location.href;
+        const matched = msg.patterns.find((p: string) => matchesPattern(p, undefined, url));
+        if (matched) {
+          const color = msg.color || '#ff6666';
+          const position = msg.bannerPosition || 'top';
+          const size = msg.bannerSize || 4;
+          showBanner(matched, color, position, size);
+          return;
+        }
+      } catch (e) {
+        console.error('[env-marker][content] applySettingsPayload evaluate patterns error', e);
+      }
+    }
+  } catch (e) {
+    console.error('[env-marker][content] applySettingsPayload error', e);
   }
 }
 
@@ -319,12 +445,17 @@ async function updateBannerFromStorageForLast() {
             banner.style.fontSize = '14px';
             banner.style.fontWeight = 'bold';
             banner.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
-            banner.textContent = last.text;
+              banner.textContent = last.text;
             banner.style.top = '';
             banner.style.bottom = '';
             banner.style.left = '';
             banner.style.right = '';
             banner.style.transform = '';
+            // clear bar/frame specific styles that may remain
+            banner.style.height = '';
+            banner.style.border = '';
+            banner.style.boxSizing = '';
+            banner.style.width = '200px';
             switch (position) {
               case 'top-right': banner.style.top = '25px'; banner.style.right = '-50px'; banner.style.transform = 'rotate(45deg)'; break;
               case 'top-left': banner.style.top = '25px'; banner.style.left = '-50px'; banner.style.transform = 'rotate(-45deg)'; break;
@@ -339,13 +470,23 @@ async function updateBannerFromStorageForLast() {
             banner.style.left = '';
             banner.style.right = '';
             banner.style.transform = '';
+              // clear ribbon-specific styles that may remain
+              banner.style.padding = '';
+              banner.style.textAlign = '';
+              banner.style.color = '';
+              banner.style.fontSize = '';
+              banner.style.fontWeight = '';
+              banner.style.boxShadow = '';
+              banner.textContent = '';
             switch (position) {
               case 'bottom': banner.style.bottom = '0'; banner.style.left = '0'; banner.style.width = '100%'; banner.style.height = bannerSize; break;
               case 'left': banner.style.top = '0'; banner.style.left = '0'; banner.style.width = bannerSize; banner.style.height = '100vh'; break;
               case 'right': banner.style.top = '0'; banner.style.right = '0'; banner.style.width = bannerSize; banner.style.height = '100vh'; break;
-              case 'frame': banner.style.top = '0'; banner.style.left = '0'; banner.style.width = '100vw'; banner.style.height = '100vh'; banner.style.border = `${bannerSize} solid ${color}`; banner.style.boxSizing = 'border-box'; break;
-              case 'top': default: banner.style.top = '0'; banner.style.left = '0'; banner.style.width = '100%'; banner.style.height = bannerSize; break;
+              case 'frame': banner.style.top = '0'; banner.style.left = '0'; banner.style.width = '100vw'; banner.style.height = '100vh'; banner.style.border = `${bannerSize} solid ${color}`; banner.style.boxSizing = 'border-box'; banner.style.pointerEvents = 'none'; banner.style.background = 'transparent'; createFrameBorderClickers(color, size); break;
+              case 'top': banner.style.top = '0'; banner.style.left = '0'; banner.style.width = '100%'; banner.style.height = bannerSize; break;
+              default: break;
             }
+            if (position !== 'frame') removeFrameCloseButton();
           }
           // update favicon/title
           try { setFavicon(color); } catch (e) {}
@@ -401,5 +542,61 @@ function setFavicon(color: string) {
     document.head.appendChild(link);
   } catch (e) {
     console.error('[env-marker][content] setFavicon error', e);
+  }
+}
+
+// Create four clickable border strips for the frame overlay so clicking the frame removes it.
+function createFrameBorderClickers(color: string, size: number) {
+  try {
+    // Remove any existing border clickers/close button first
+    removeFrameCloseButton();
+    const thickness = `${size || 4}px`;
+    const z = 2147483648;
+    // helper to create a strip
+    const make = (id: string, styles: Partial<CSSStyleDeclaration>) => {
+      if (document.getElementById(id)) return;
+      const el = document.createElement('div');
+      el.id = id;
+      Object.assign(el.style, {
+        position: 'fixed',
+        background: color || '#ff6666',
+        zIndex: String(z),
+        cursor: 'pointer',
+        pointerEvents: 'auto',
+        userSelect: 'none'
+      } as any);
+      for (const k in styles) {
+        try { (el.style as any)[k] = (styles as any)[k]; } catch(e){}
+      }
+      el.addEventListener('click', () => {
+        const b = document.getElementById('env-marker-banner');
+        if (b) b.remove();
+        removeFrameCloseButton();
+      });
+      document.documentElement.appendChild(el);
+    };
+
+    // Top strip
+    make('env-marker-frame-border-top', { top: '0', left: '0', right: '0', height: thickness });
+    // Bottom strip
+    make('env-marker-frame-border-bottom', { bottom: '0', left: '0', right: '0', height: thickness });
+    // Left strip
+    make('env-marker-frame-border-left', { top: '0', bottom: '0', left: '0', width: thickness });
+    // Right strip
+    make('env-marker-frame-border-right', { top: '0', bottom: '0', right: '0', width: thickness });
+  } catch (e) {
+    console.error('[env-marker][content] createFrameBorderClickers error', e);
+  }
+}
+
+function removeFrameCloseButton() {
+  try {
+    const ids = ['env-marker-frame-close', 'env-marker-frame-border-top', 'env-marker-frame-border-bottom', 'env-marker-frame-border-left', 'env-marker-frame-border-right'];
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+  } catch (e) {
+    console.error('[env-marker][content] removeFrameCloseButton error', e);
   }
 }
