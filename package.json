@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wxt",
     "build": "rm -r .output/chrome-mv3 && wxt build",
+    "test": "vitest run --environment jsdom",
     "resize-screenshots": "node scripts/resize_screenshots.mjs"
   },
   "repository": {
@@ -25,6 +26,7 @@
     "@types/chrome": "^0.1.31",
     "@types/node": "^24.10.1",
     "assert": "^2.1.0",
+    "jsdom": "^27.2.0",
     "sharp": "^0.34.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
