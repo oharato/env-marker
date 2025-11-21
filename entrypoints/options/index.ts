@@ -171,6 +171,13 @@ async function save(): Promise<void> {
   if (!settingSelectorEl || !patternsEl || !colorEl || !bannerSizeEl || !enabledEl || !settingNameEl) return;
 
   const currentSetting = settingSelectorEl.value;
+  
+  // Get old patterns to detect if they changed
+  const oldData = await chrome.storage.sync.get({
+    [`${currentSetting}_patterns`]: []
+  }) as Record<string, any>;
+  const oldPatterns: string[] = oldData[`${currentSetting}_patterns`] || [];
+  
   const patterns = patternsEl.value.split(/\s+/).filter(Boolean);
   const color = colorEl.value;
   const enabled = enabledEl.checked;
@@ -184,7 +191,10 @@ async function save(): Promise<void> {
     bannerSize = 4; // 不正な値や1未満の場合はデフォルト値にフォールバック
   }
 
-  console.debug('[env-marker][options] Saving settings:', { currentSetting, patterns, color, bannerPosition, bannerSize, enabled, name });
+  // Check if patterns have changed
+  const patternsChanged = !arraysEqual(oldPatterns, patterns);
+
+  console.debug('[env-marker][options] Saving settings:', { currentSetting, patterns, color, bannerPosition, bannerSize, enabled, name, patternsChanged });
 
   // Save with setting-specific keys
   const settingsData: Record<string, any> = {
@@ -204,8 +214,20 @@ async function save(): Promise<void> {
   // セレクトボックスの表示を更新
   updateSelectorDisplay(currentSetting, name);
   
-  // すべてのタブに設定変更を通知して即座に反映
-  await notifyAllTabs();
+  // パターンが変更された場合はタブをリロード、それ以外は設定変更を通知して即座に反映
+  if (patternsChanged) {
+    await reloadAllTabs();
+  } else {
+    await notifyAllTabs();
+  }
+}
+
+// 配列が等しいかチェック
+function arraysEqual(arr1: string[], arr2: string[]): boolean {
+  if (arr1.length !== arr2.length) return false;
+  const sorted1 = [...arr1].sort();
+  const sorted2 = [...arr2].sort();
+  return sorted1.every((val, idx) => val === sorted2[idx]);
 }
 
 // セレクトボックスの表示を更新
@@ -216,6 +238,25 @@ function updateSelectorDisplay(settingKey: string, name: string): void {
   if (option) {
     const defaultName = option.getAttribute('data-default-name') || settingKey;
     option.textContent = name ? name : defaultName;
+  }
+}
+
+// すべてのタブをリロード（パターン変更時）
+async function reloadAllTabs(): Promise<void> {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+        try {
+          chrome.tabs.reload(tab.id);
+        } catch (e) {
+          console.debug('[env-marker][options] Failed to reload tab:', tab.id, e);
+        }
+      }
+    }
+    console.debug('[env-marker][options] Reloaded all tabs due to pattern change');
+  } catch (e) {
+    console.error('[env-marker][options] Failed to reload tabs:', e);
   }
 }
 
