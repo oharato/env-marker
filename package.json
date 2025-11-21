@@ -1,6 +1,6 @@
 {
   "name": "env-color",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "指定したURLやIPアドレスのサイトを開いたときに、視覚的に識別しやすくするためのChrome拡張。",
   "main": "background.js",
   "scripts": {
