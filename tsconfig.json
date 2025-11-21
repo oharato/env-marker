@@ -10,6 +10,7 @@
   },
   "include": [
     ".wxt/types/imports.d.ts",
+    "types/**/*.d.ts",
     "entrypoints/**/*.ts",
     "components/**/*.ts",
     "hooks/**/*.ts",

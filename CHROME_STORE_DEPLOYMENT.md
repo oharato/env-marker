@@ -286,3 +286,9 @@ export default defineConfig({
 - [Chrome Web Store API Documentation](https://developer.chrome.com/docs/webstore/using_webstore_api/)
 - [Google Cloud Console](https://console.cloud.google.com/)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
+
+## 実装上の注意（権限と更新フロー）
+
+- 本プロジェクトは動的なスクリプト注入（`scripting` 権限）を使わない設計です。content script は manifest で `document_start` に登録され、ページ読み込み時に常駐します。
+- オプション変更時は、拡張が開いているタブをリロードせず、`chrome.tabs.sendMessage` を用いて各タブに通知します。content script 側で `chrome.storage.onChanged` とメッセージ受信を監視し、バナーの再評価・更新を行うため、ユーザー操作による即時反映が可能です。
+- そのため、Chrome Web Store に提出する `manifest.json` から `scripting` パーミッションを排除しており、最小限の権限で動作します。
