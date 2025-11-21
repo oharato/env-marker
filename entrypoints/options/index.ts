@@ -171,6 +171,13 @@ async function save(): Promise<void> {
   if (!settingSelectorEl || !patternsEl || !colorEl || !bannerSizeEl || !enabledEl || !settingNameEl) return;
 
   const currentSetting = settingSelectorEl.value;
+  
+  // Get old patterns to detect if they changed
+  const oldData = await chrome.storage.sync.get({
+    [`${currentSetting}_patterns`]: []
+  }) as Record<string, any>;
+  const oldPatterns: string[] = oldData[`${currentSetting}_patterns`] || [];
+  
   const patterns = patternsEl.value.split(/\s+/).filter(Boolean);
   const color = colorEl.value;
   const enabled = enabledEl.checked;
@@ -184,7 +191,10 @@ async function save(): Promise<void> {
     bannerSize = 4; // 不正な値や1未満の場合はデフォルト値にフォールバック
   }
 
-  console.debug('[env-marker][options] Saving settings:', { currentSetting, patterns, color, bannerPosition, bannerSize, enabled, name });
+  // Check if patterns have changed
+  const patternsChanged = !arraysEqual(oldPatterns, patterns);
+
+  console.debug('[env-marker][options] Saving settings:', { currentSetting, patterns, color, bannerPosition, bannerSize, enabled, name, patternsChanged });
 
   // Save with setting-specific keys
   const settingsData: Record<string, any> = {
@@ -204,8 +214,19 @@ async function save(): Promise<void> {
   // セレクトボックスの表示を更新
   updateSelectorDisplay(currentSetting, name);
   
-  // すべてのタブに設定変更を通知して即座に反映
-  await notifyAllTabs();
+  // パターンが変更された場合はタブをリロード、それ以外は設定変更を通知して即座に反映
+  // パターンが変更された場合は、まず各タブに新しいパターン一覧を含むペイロードを送信し、
+  // sendMessage が失敗した（= content script 未注入など）タブだけをリロードする。
+  // これにより多くのタブでリロード不要の即時反映が可能になる。
+  await notifyAllTabs(patternsChanged);
+}
+
+// 配列が等しいかチェック
+function arraysEqual(arr1: string[], arr2: string[]): boolean {
+  if (arr1.length !== arr2.length) return false;
+  const sorted1 = [...arr1].sort();
+  const sorted2 = [...arr2].sort();
+  return sorted1.every((val, idx) => val === sorted2[idx]);
 }
 
 // セレクトボックスの表示を更新
@@ -219,21 +240,78 @@ function updateSelectorDisplay(settingKey: string, name: string): void {
   }
 }
 
-// すべてのタブに設定変更を通知
-async function notifyAllTabs(): Promise<void> {
+// すべてのタブをリロード（パターン変更時）
+async function reloadAllTabs(): Promise<void> {
   try {
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
       if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
         try {
-          // 通常は content script が常駐しているため reload ではなくメッセージを送る
-          chrome.tabs.sendMessage(tab.id, { type: 'env-marker-settings-changed' });
+          chrome.tabs.reload(tab.id);
         } catch (e) {
-          // sendMessage が失敗する場合（コンテンツスクリプト未登録など）は無視
+          console.debug('[env-marker][options] Failed to reload tab:', tab.id, e);
         }
       }
     }
-    console.debug('[env-marker][options] Notified all tabs of settings change');
+    console.debug('[env-marker][options] Reloaded all tabs due to pattern change');
+  } catch (e) {
+    console.error('[env-marker][options] Failed to reload tabs:', e);
+  }
+}
+
+// すべてのタブに設定変更を通知
+// If `forceReloadOnFailure` is true, tabs where sendMessage fails will be reloaded.
+async function notifyAllTabs(forceReloadOnFailure: boolean = false): Promise<void> {
+  try {
+    // Load current setting data and include it in the message payload so
+    // content scripts can update immediately without reading storage.
+    const { currentSetting } = await chrome.storage.sync.get({ currentSetting: 'setting1' }) as { currentSetting: string };
+    const key = currentSetting || 'setting1';
+    const data = await chrome.storage.sync.get({
+      [`${key}_patterns`]: [],
+      [`${key}_color`]: '#ff6666',
+      [`${key}_bannerPosition`]: 'top',
+      [`${key}_bannerSize`]: 4,
+      [`${key}_enabled`]: true
+    }) as Record<string, any>;
+
+    const payload = {
+      type: 'env-marker-settings-changed',
+      settingKey: key,
+      patterns: data[`${key}_patterns`] || [],
+      color: data[`${key}_color`] || '#ff6666',
+      bannerPosition: data[`${key}_bannerPosition`] || 'top',
+      bannerSize: data[`${key}_bannerSize`] || 4,
+      enabled: data[`${key}_enabled`] !== false,
+      timestamp: Date.now()
+    } as Record<string, any>;
+
+    const tabs = await chrome.tabs.query({});
+    const failedTabIds: number[] = [];
+    for (const tab of tabs) {
+      if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+        try {
+          chrome.tabs.sendMessage(tab.id, payload);
+        } catch (e) {
+          // sendMessage が失敗する場合（コンテンツスクリプト未登録など）は記録しておく
+          if (tab.id) failedTabIds.push(tab.id);
+        }
+      }
+    }
+
+    console.debug('[env-marker][options] Notified all tabs of settings change with payload', { failedTabCount: failedTabIds.length });
+
+    // patternsChanged の場合など、必要に応じてメッセージが届かなかったタブだけをリロードする
+    if (forceReloadOnFailure && failedTabIds.length > 0) {
+      for (const id of failedTabIds) {
+        try {
+          chrome.tabs.reload(id);
+        } catch (e) {
+          console.debug('[env-marker][options] Failed to reload tab:', id, e);
+        }
+      }
+      console.debug('[env-marker][options] Reloaded tabs where messaging failed', { reloadedCount: failedTabIds.length });
+    }
   } catch (e) {
     console.error('[env-marker][options] Failed to notify tabs:', e);
   }
