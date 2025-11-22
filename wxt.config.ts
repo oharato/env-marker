@@ -5,7 +5,7 @@ export default defineConfig({
   manifest: {
     name: 'Env Marker',
     version: pkg.version,
-    description: '指定したURLやIPアドレスのサイトに目印をつけます',
+    description: '指定したURLやIPアドレスのサイトに目印をつけます (Visually marks sites matching specified URLs or IP addresses)',
     permissions: ['storage', 'webRequest'],
     icons: {
       '16': 'icon16.png',

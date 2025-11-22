@@ -1,7 +1,7 @@
 {
   "name": "env-color",
   "version": "1.0.2",
-  "description": "指定したURLやIPアドレスのサイトを開いたときに、視覚的に識別しやすくするためのChrome拡張。",
+  "description": "指定したURLやIPアドレスのサイトを視覚的に識別します。 (Visually marks sites matching specified URLs or IP addresses.)",
   "main": "background.js",
   "scripts": {
     "dev": "wxt",
