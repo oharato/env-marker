@@ -1,6 +1,8 @@
 // options.ts
 "use strict";
 import ip6 from 'ip6';
+import { DEFAULT_SETTINGS } from '../../src/constants';
+import { loadSetting, SETTING_KEYS } from '../../src/settings';
 
 const settingSelectorEl = document.getElementById('setting-selector') as HTMLSelectElement | null;
 const settingNameEl = document.getElementById('setting-name') as HTMLInputElement | null;
@@ -14,9 +16,7 @@ const enabledEl = document.getElementById('enabled') as HTMLInputElement | null;
 
 // 初回ロード時にすべての設定名を読み込んでセレクトボックスを更新
 async function loadAllSettingNames(): Promise<void> {
-  const allSettings = ['setting1', 'setting2', 'setting3', 'setting4', 'setting5'];
-  
-  for (const settingKey of allSettings) {
+  for (const settingKey of SETTING_KEYS) {
     const data = await chrome.storage.sync.get({ [`${settingKey}_name`]: settingKey }) as Record<string, any>;
     const name = data[`${settingKey}_name`] || settingKey;
     updateSelectorDisplay(settingKey, name);
@@ -38,64 +38,34 @@ async function load(): Promise<void> {
 }
 
 async function loadSettingProfile(settingKey: string): Promise<void> {
-  // Load from sync storage with defaults
-  const defaultName = settingKey; // デフォルト名はsettingKeyと同じ
-  const defaultSettings = {
-    [`${settingKey}_patterns`]: [],
-    [`${settingKey}_color`]: '#ff6666',
-    [`${settingKey}_bannerPosition`]: 'top',
-    [`${settingKey}_bannerSize`]: 4,
-    [`${settingKey}_enabled`]: true,
-    [`${settingKey}_name`]: defaultName
-  };
-  
-  const data = await chrome.storage.sync.get(defaultSettings) as Record<string, any>;
-  let patterns: string[] = data[`${settingKey}_patterns`];
-  let color: string = data[`${settingKey}_color`];
-  let bannerPosition: string = data[`${settingKey}_bannerPosition`];
-  let bannerSize: number = data[`${settingKey}_bannerSize`];
-  let enabled: boolean = data[`${settingKey}_enabled`] !== false;
-  let name: string = data[`${settingKey}_name`] || defaultName;
-
-  // Fallback to local storage if sync is empty
-  if (!patterns || patterns.length === 0) {
-    const fallback = await chrome.storage.local.get(defaultSettings) as Record<string, any>;
-    console.debug('[env-marker][options] Trying to load from local storage fallback.');
-    patterns = fallback[`${settingKey}_patterns`] || patterns;
-    color = fallback[`${settingKey}_color`] || color;
-    bannerPosition = fallback[`${settingKey}_bannerPosition`] || bannerPosition;
-    bannerSize = fallback[`${settingKey}_bannerSize`] || bannerSize;
-    enabled = fallback[`${settingKey}_enabled`] !== false;
-    name = fallback[`${settingKey}_name`] || defaultName;
-  }
-  
-  console.debug('[env-marker][options] Loaded data:', { settingKey, patterns, color, bannerPosition, bannerSize, enabled, name });
+  const setting = await loadSetting(settingKey);
+  console.debug('[env-marker][options] Loaded data:', setting);
 
   if (patternsEl) {
-    patternsEl.value = (patterns || []).join('\n');
+    patternsEl.value = (setting.patterns || []).join('\n');
   }
   if (colorEl) {
-    colorEl.value = color || '#ff6666';
+    colorEl.value = setting.color;
   }
   if (bannerSizeEl) {
-    bannerSizeEl.value = String(bannerSize || 4);
+    bannerSizeEl.value = String(setting.bannerSize);
   }
   if (enabledEl) {
-    enabledEl.checked = enabled;
+    enabledEl.checked = setting.enabled;
   }
   if (settingNameEl) {
-    settingNameEl.value = name;
+    settingNameEl.value = setting.name;
   }
   
-  const positionToSet = bannerPosition || 'top';
+  const positionToSet = setting.bannerPosition;
   const positionRadio = document.querySelector(`input[name="position"][value="${positionToSet}"]`) as HTMLInputElement | null;
   
   if (positionRadio) {
     positionRadio.checked = true;
   } else {
     // もし該当するラジオボタンがなければ、安全のために 'top' を選択状態にする
-    console.warn(`[env-marker][options] Could not find radio button for position: "${positionToSet}", defaulting to "top".`);
-    const topRadio = document.querySelector('input[name="position"][value="top"]') as HTMLInputElement | null;
+    console.warn(`[env-marker][options] Could not find radio button for position: "${positionToSet}", defaulting to "${DEFAULT_SETTINGS.BANNER_POSITION}".`);
+    const topRadio = document.querySelector(`input[name="position"][value="${DEFAULT_SETTINGS.BANNER_POSITION}"]`) as HTMLInputElement | null;
     if (topRadio) {
       topRadio.checked = true;
     }
@@ -184,11 +154,11 @@ async function save(): Promise<void> {
   const name = settingNameEl.value.trim();
   
   const checkedPositionEl = document.querySelector('input[name="position"]:checked') as HTMLInputElement | null;
-  const bannerPosition = checkedPositionEl ? checkedPositionEl.value : 'top';
+  const bannerPosition = checkedPositionEl ? checkedPositionEl.value : DEFAULT_SETTINGS.BANNER_POSITION;
   
   let bannerSize = parseInt(bannerSizeEl.value, 10);
   if (isNaN(bannerSize) || bannerSize < 1) {
-    bannerSize = 4; // 不正な値や1未満の場合はデフォルト値にフォールバック
+    bannerSize = DEFAULT_SETTINGS.BANNER_SIZE; // 不正な値や1未満の場合はデフォルト値にフォールバック
   }
 
   // Check if patterns have changed
@@ -215,9 +185,6 @@ async function save(): Promise<void> {
   updateSelectorDisplay(currentSetting, name);
   
   // パターンが変更された場合はタブをリロード、それ以外は設定変更を通知して即座に反映
-  // パターンが変更された場合は、まず各タブに新しいパターン一覧を含むペイロードを送信し、
-  // sendMessage が失敗した（= content script 未注入など）タブだけをリロードする。
-  // これにより多くのタブでリロード不要の即時反映が可能になる。
   await notifyAllTabs(patternsChanged);
 }
 
@@ -267,22 +234,18 @@ async function notifyAllTabs(forceReloadOnFailure: boolean = false): Promise<voi
     // content scripts can update immediately without reading storage.
     const { currentSetting } = await chrome.storage.sync.get({ currentSetting: 'setting1' }) as { currentSetting: string };
     const key = currentSetting || 'setting1';
-    const data = await chrome.storage.sync.get({
-      [`${key}_patterns`]: [],
-      [`${key}_color`]: '#ff6666',
-      [`${key}_bannerPosition`]: 'top',
-      [`${key}_bannerSize`]: 4,
-      [`${key}_enabled`]: true
-    }) as Record<string, any>;
+    
+    // Use loadSetting to get consistent fallback behavior
+    const setting = await loadSetting(key);
 
     const payload = {
       type: 'env-marker-settings-changed',
       settingKey: key,
-      patterns: data[`${key}_patterns`] || [],
-      color: data[`${key}_color`] || '#ff6666',
-      bannerPosition: data[`${key}_bannerPosition`] || 'top',
-      bannerSize: data[`${key}_bannerSize`] || 4,
-      enabled: data[`${key}_enabled`] !== false,
+      patterns: setting.patterns,
+      color: setting.color,
+      bannerPosition: setting.bannerPosition,
+      bannerSize: setting.bannerSize,
+      enabled: setting.enabled,
       timestamp: Date.now()
     } as Record<string, any>;
 

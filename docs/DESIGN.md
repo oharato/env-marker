@@ -8,11 +8,12 @@
 ### 主要コンポーネント
 - `entrypoints/background.ts`
   - `chrome.webRequest.onCompleted` で接続先 `remoteIp` を受け取り、保存されたプロファイルのパターンと照合します。
+  - プロファイルの照合は `setting1` から `setting5` の順に行われ、最初にマッチした設定が適用されます。
   - パターン判定には `src/ipMatcher.ts` の `matchesPattern(pattern, remoteIp, url)` を使用します。
   - マッチが見つかれば該当タブに `{ type: 'show-env-marker-banner', ... }` メッセージを送信します。
 
 - `entrypoints/content.ts`
-  - `document_start` で常駐し、`evaluatePatternsAndShow()` を起動して現在の `location.href` と `chrome.storage` の設定を照合します。
+  - `document_start` で常駐し、`evaluatePatternsAndShow()` を起動して現在の `location.href` と `chrome.storage` の設定を照合します（backgroundと同様、setting1優先で評価）。
   - `chrome.runtime.onMessage` と `chrome.storage.onChanged` を監視し、設定変更やオプション更新時に既存バナーを更新します（タブのリロード不要）。
   - `showBanner()` は一旦 `visibility: hidden` で要素を作成し、スタイル適用後に `visibility: visible` にしてチラつきを防ぎます。
 
