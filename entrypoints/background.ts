@@ -1,4 +1,5 @@
 import { matchesPattern } from '../src/ipMatcher';
+import { loadAllEnabledSettings } from '../src/settings';
 
 export default defineBackground({
   main() {
@@ -25,94 +26,28 @@ export default defineBackground({
         }
         
         // すべての有効な設定プロファイルをチェック
-        const allSettings = ['setting1', 'setting2', 'setting3', 'setting4', 'setting5'];
-        let matchedResult: { pattern: string; color: string } | null = null;
+        const allSettings = await loadAllEnabledSettings();
+        let matchedResult: { pattern: string; color: string; position: string; size: number } | null = null;
 
-        for (const settingKey of allSettings) {
-          const data = await chrome.storage.sync.get({
-            [`${settingKey}_patterns`]: [],
-            [`${settingKey}_color`]: '#ff6666',
-            [`${settingKey}_bannerPosition`]: 'top',
-            [`${settingKey}_bannerSize`]: 40,
-            [`${settingKey}_enabled`]: true
-          });
-          const dataAny = data as any;
-          const enabled = dataAny[`${settingKey}_enabled`];
-          if (!enabled) {
-            console.debug(`[env-marker][background] ${settingKey} is disabled, skipping`);
-            continue;
-          }
-
-          let patterns: string[] = (dataAny[`${settingKey}_patterns`] as string[]) || [];
-          let color: string = (dataAny[`${settingKey}_color`] as string) || '#ff6666';
-          let bannerPosition: string = (dataAny[`${settingKey}_bannerPosition`] as string) || 'top';
-          let bannerSize: number = (dataAny[`${settingKey}_bannerSize`] as number) || 40;
-          
-          if ((!patterns || patterns.length === 0) || !color) {
-            const fallback = await chrome.storage.local.get({
-              [`${settingKey}_patterns`]: [],
-              [`${settingKey}_color`]: '#ff6666'
-            });
-            const fallbackAny = fallback as any;
-            if ((!patterns || patterns.length === 0) && fallbackAny[`${settingKey}_patterns`] && fallbackAny[`${settingKey}_patterns`].length > 0) {
-              console.debug('[env-marker][background] sync empty, using local storage patterns', fallbackAny[`${settingKey}_patterns`]);
-              patterns = fallbackAny[`${settingKey}_patterns`];
-            }
-            if ((!color || color === '') && fallbackAny[`${settingKey}_color`]) {
-              color = fallbackAny[`${settingKey}_color`];
-            }
-            if ((!bannerPosition || bannerPosition === '') && fallbackAny[`${settingKey}_bannerPosition`]) {
-              bannerPosition = fallbackAny[`${settingKey}_bannerPosition`];
-            }
-            if ((!bannerSize || bannerSize === 0) && fallbackAny[`${settingKey}_bannerSize`]) {
-              bannerSize = fallbackAny[`${settingKey}_bannerSize`];
-            }
-          }
-
-          // IPv6アドレス判定（: が含まれ、URLスキームが含まれない簡易判定）
-          function isIPv6Pattern(str: string) {
-            return typeof str === 'string' && str.includes(':') && !/^https?:\/\//i.test(str);
-          }
-
-          // IPv6アドレス（フル表記）を BigInt に変換
-          function ipv6ToBigInt(normalizedAddr: string) {
-            const hex = normalizedAddr.replace(/:/g, '');
-            return BigInt('0x' + hex);
-          }
-
-              const matchedPattern = patterns.find((pattern: string) => {
-              if (pattern.trim() === '') return false;
+        for (const setting of allSettings) {
+          const matchedPattern = setting.patterns.find((pattern: string) => {
+            if (!pattern || pattern.trim() === '') return false;
             try {
-              const results: any = { cidr: false, wildcard: false, normalized: false, regex: false, error: null };
-              // --- temporary detailed debug logging for IPv6 troubleshooting ---
-              const patt = pattern.trim();
-              const cleanPattern = patt.replace(/^\[|\]$/g, '');
-              const remoteClean = remoteIp ? String(remoteIp).replace(/^\[|\]$/g, '') : remoteIp;
-              console.debug('[env-marker][background][dbg] eval pattern', {patt, cleanPattern, remoteIp, remoteClean, url: details.url});
-              // (debug) skip expensive normalization here; matcher handles normalization
-              console.debug('[env-marker][background][dbg] eval pattern (skipping normalize)', {patt, cleanPattern, remoteIp, remoteClean, url: details.url});
-              // --- end temporary logs ---
-              // Use centralized matcher
-              try {
-                const ok = matchesPattern(pattern, remoteIp ? String(remoteIp) : undefined, details.url);
-                if (ok) {
-                  console.debug('[env-marker][background][dbg] pattern matched via matchesPattern', { pattern });
-                  return true;
-                }
-                return false;
-              } catch (e) {
-                console.error('[env-marker][background] matchesPattern threw', e);
-                return false;
-              }
+              return matchesPattern(pattern, remoteIp ? String(remoteIp) : undefined, details.url);
             } catch (e) {
-              console.error(`[env-marker][background] Invalid regex pattern from user input: "${pattern}"`, e);
+              console.error('[env-marker][background] matchesPattern threw', e);
               return false;
             }
           });
 
           if (matchedPattern) {
-            console.info(`[env-marker][background] Matched with ${settingKey}:`, matchedPattern);
-            matchedResult = { pattern: matchedPattern, color: color, position: bannerPosition, size: bannerSize } as any;
+            console.info(`[env-marker][background] Matched with ${setting.key}:`, matchedPattern);
+            matchedResult = { 
+              pattern: matchedPattern, 
+              color: setting.color, 
+              position: setting.bannerPosition, 
+              size: setting.bannerSize 
+            };
             break; // 最初にマッチした設定を使用
           }
         }
@@ -130,7 +65,7 @@ export default defineBackground({
           if (targetUrl.startsWith('chrome-extension://') || targetUrl.startsWith('chrome://') || targetUrl.startsWith('about:') ) {
             console.debug('[env-marker][background] skip sending message to internal/extension page', {tabId: details.tabId, url: targetUrl});
           } else {
-            const msg = {type: 'show-env-marker-banner', text: matchedResult.pattern, color: matchedResult.color, position: (matchedResult as any).position, size: (matchedResult as any).size};
+            const msg = {type: 'show-env-marker-banner', text: matchedResult.pattern, color: matchedResult.color, position: matchedResult.position, size: matchedResult.size};
 
             // helper: attempt sendMessage with limited retries if the tab hasn't yet registered a listener
             const sendWithRetry = (tabId: number, attemptsLeft = 5, delayMs = 250) => {
