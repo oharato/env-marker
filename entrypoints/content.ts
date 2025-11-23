@@ -23,11 +23,10 @@ export default defineContentScript({
                   let size: number | undefined = msg.size as any;
                   if (!position || !size) {
                     const { currentSetting } = await chrome.storage.sync.get({ currentSetting: 'setting1' });
-                    const data = await chrome.storage.sync.get({
-                      [`${currentSetting}_bannerPosition`]: 'top',
-                      [`${currentSetting}_bannerSize`]: 40
-                    });
-                    const dataAny = data as any;
+                            const data = await chrome.storage.sync.get({
+                              [`${currentSetting}_bannerPosition`]: 'top-left',
+                              [`${currentSetting}_bannerSize`]: 40
+                            });                    const dataAny = data as any;
                     position = position || (dataAny[`${currentSetting}_bannerPosition`] as string) || 'top';
                     size = size || (dataAny[`${currentSetting}_bannerSize`] as number) || 40;
                   }

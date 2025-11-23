@@ -81,6 +81,15 @@ export function applySettingsPayload(msg: any) {
     if (last.timestamp && msg.timestamp && msg.timestamp < last.timestamp) return;
     const banner = document.getElementById('env-marker-banner');
 
+    if (msg.enabled === false) {
+      if (banner && last && last.text && Array.isArray(msg.patterns) && msg.patterns.includes(last.text)) {
+        banner.remove();
+        removeFrameCloseButton();
+        (window as any).__env_marker_lastBanner = null;
+      }
+      return;
+    }
+
     if (banner && last && last.text && Array.isArray(msg.patterns) && msg.patterns.find((p: string) => p === last.text)) {
       try {
         const color = msg.color || last.color || '#ff6666';
@@ -174,16 +183,21 @@ export async function updateBannerFromStorageForLast() {
     const last = (window as any).__env_marker_lastBanner;
     if (!last || !last.text) return;
     const allSettings = ['setting1', 'setting2', 'setting3', 'setting4', 'setting5'];
+    let foundMatch = false;
     for (const key of allSettings) {
       const data = await chrome.storage.sync.get({
         [`${key}_patterns`]: [],
         [`${key}_color`]: '#ff6666',
         [`${key}_bannerPosition`]: 'top',
         [`${key}_bannerSize`]: 40,
+        [`${key}_enabled`]: true
       });
       const any = data as any;
+      if (any[`${key}_enabled`] === false) continue;
+
       const patterns: string[] = any[`${key}_patterns`] || [];
       if (patterns.find(p => p === last.text)) {
+        foundMatch = true;
         const color = (any[`${key}_color`] as string) || last.color || '#ff6666';
         const position = (any[`${key}_bannerPosition`] as string) || last.position || 'top';
         const size = (any[`${key}_bannerSize`] as number) || last.size || 40;
@@ -248,6 +262,15 @@ export async function updateBannerFromStorageForLast() {
           console.error('[env-marker][banner] updateBannerFromStorageForLast error', e);
         }
         return;
+      }
+    }
+    
+    if (!foundMatch) {
+      const banner = document.getElementById('env-marker-banner');
+      if (banner) {
+        banner.remove();
+        removeFrameCloseButton();
+        (window as any).__env_marker_lastBanner = null;
       }
     }
   } catch (e) {

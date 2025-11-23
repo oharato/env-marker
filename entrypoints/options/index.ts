@@ -43,7 +43,7 @@ async function loadSettingProfile(settingKey: string): Promise<void> {
   const defaultSettings = {
     [`${settingKey}_patterns`]: [],
     [`${settingKey}_color`]: '#ff6666',
-    [`${settingKey}_bannerPosition`]: 'top',
+    [`${settingKey}_bannerPosition`]: 'top-left',
     [`${settingKey}_bannerSize`]: 4,
     [`${settingKey}_enabled`]: true,
     [`${settingKey}_name`]: defaultName
@@ -87,7 +87,7 @@ async function loadSettingProfile(settingKey: string): Promise<void> {
     settingNameEl.value = name;
   }
   
-  const positionToSet = bannerPosition || 'top';
+  const positionToSet = bannerPosition || 'top-left';
   const positionRadio = document.querySelector(`input[name="position"][value="${positionToSet}"]`) as HTMLInputElement | null;
   
   if (positionRadio) {
