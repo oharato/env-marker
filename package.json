@@ -32,14 +32,6 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.12",
     "wxt": "^0.20.11"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "sharp",
-      "spawn-sync"
-    ]
-  },
   "dependencies": {
     "ip6": "^0.2.11"
   }
